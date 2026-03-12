@@ -26,7 +26,7 @@ object DownloadIslandNotification {
     ) {
         try {
             val isComplete = progress >= 100
-            val displayTitle = if (progress in 0..99) "下载中 $progress%" else title
+            val displayTitle = if (progress in 0..99) "$fileName%下载中 $progress%" else title
             val displayContent = if (isComplete) "下载完成" else text.ifEmpty { fileName }
 
             val downloadIconRes = if (isComplete) android.R.drawable.stat_sys_download_done
@@ -84,10 +84,6 @@ object DownloadIslandNotification {
                     }
                 }
 
-                picInfo {
-                    type = 1
-                    pic = downloadIconKey
-                }
 
                 // 操作按钮（下载完成时不显示按钮）
                 if (!isComplete) {
@@ -115,6 +111,19 @@ object DownloadIslandNotification {
             }
 
             extras.putAll(islandExtras)
+
+            // AOD 息屏显示：合并进已有的 miui.focus.param
+            val aodTitle = if (isComplete) "下载完成" else "下载中 $progress%"
+            val existingParam = extras.getString("miui.focus.param")
+            if (existingParam != null) {
+                try {
+                    val json = org.json.JSONObject(existingParam)
+                    val pv2 = json.optJSONObject("param_v2") ?: org.json.JSONObject()
+                    pv2.put("aodTitle", aodTitle)
+                    json.put("param_v2", pv2)
+                    extras.putString("miui.focus.param", json.toString())
+                } catch (_: Exception) {}
+            }
 
             XposedBridge.log("HyperIsland: Island injected — $fileName ($progress%)")
 
