@@ -132,54 +132,96 @@ object InProcessController {
     // ── 控制逻辑 ──────────────────────────────────────────────────────────────
 
     private fun pause(context: Context, downloadId: Long) {
-        if (callDmMethod(context, "pauseDownload", downloadId)) return
+        // 先尝试 MiuiDownloadManager 反射（传入真实 ID 和通过查询得到的真实 IDs）
+        val realIds = queryActiveIds(context)
+        XposedBridge.log("HyperIsland: pause notifId=$downloadId realIds=$realIds")
 
-        // 只改 control，不改 status——让 DownloadThread 自行转换状态
-        // 用 all_downloads 避免 UID 过滤
-        val values = ContentValues().apply { put("control", CONTROL_PAUSED) }
-        for (uri in listOf(
-            Uri.withAppendedPath(DOWNLOADS_URI_ALL, downloadId.toString()),
-            Uri.withAppendedPath(DOWNLOADS_URI, downloadId.toString()),
-            DOWNLOADS_URI_ALL,
-            DOWNLOADS_URI
-        )) {
-            try {
-                val sel = if (uri.lastPathSegment == downloadId.toString()) null
-                          else "_id = ?"
-                val args = if (sel == null) null else arrayOf(downloadId.toString())
-                val rows = context.contentResolver.update(uri, values, sel, args)
-                XposedBridge.log("HyperIsland: pause uri=$uri rows=$rows")
-                if (rows > 0) return
-            } catch (e: Exception) {
-                XposedBridge.log("HyperIsland: pause uri=$uri err=${e.message}")
+        // 用 DownloadManager 公开 API 无法 pause，但可以借助查到的真实 ID 更新 ContentProvider
+        val idsToTry = (listOf(downloadId) + realIds).distinct()
+        val values = ContentValues().apply {
+            put("status",  STATUS_PAUSED_BY_APP)
+            put("control", CONTROL_PAUSED)
+        }
+        for (id in idsToTry) {
+            for (uri in listOf(DOWNLOADS_URI_ALL, DOWNLOADS_URI)) {
+                try {
+                    val rows = context.contentResolver.update(
+                        uri, values, "_id = ?", arrayOf(id.toString())
+                    )
+                    XposedBridge.log("HyperIsland: pause id=$id uri=$uri rows=$rows")
+                    if (rows > 0) return
+                } catch (e: Exception) {
+                    XposedBridge.log("HyperIsland: pause id=$id uri=$uri err=${e.message}")
+                }
             }
         }
-        // 全部失败降级
+        // 最后降级：不限 ID，直接更新所有活跃下载
         pauseAll(context)
     }
 
     private fun resume(context: Context, downloadId: Long) {
-        if (callDmMethod(context, "resumeDownload", downloadId)) return
+        val realIds = queryPausedIds(context)
+        XposedBridge.log("HyperIsland: resume notifId=$downloadId realIds=$realIds")
 
-        val values = ContentValues().apply { put("control", CONTROL_RUN) }
-        for (uri in listOf(
-            Uri.withAppendedPath(DOWNLOADS_URI_ALL, downloadId.toString()),
-            Uri.withAppendedPath(DOWNLOADS_URI, downloadId.toString()),
-            DOWNLOADS_URI_ALL,
-            DOWNLOADS_URI
-        )) {
-            try {
-                val sel = if (uri.lastPathSegment == downloadId.toString()) null
-                          else "_id = ?"
-                val args = if (sel == null) null else arrayOf(downloadId.toString())
-                val rows = context.contentResolver.update(uri, values, sel, args)
-                XposedBridge.log("HyperIsland: resume uri=$uri rows=$rows")
-                if (rows > 0) return
-            } catch (e: Exception) {
-                XposedBridge.log("HyperIsland: resume uri=$uri err=${e.message}")
+        val idsToTry = (listOf(downloadId) + realIds).distinct()
+        val values = ContentValues().apply {
+            put("status",  STATUS_RUNNING)
+            put("control", CONTROL_RUN)
+        }
+        for (id in idsToTry) {
+            for (uri in listOf(DOWNLOADS_URI_ALL, DOWNLOADS_URI)) {
+                try {
+                    val rows = context.contentResolver.update(
+                        uri, values, "_id = ?", arrayOf(id.toString())
+                    )
+                    XposedBridge.log("HyperIsland: resume id=$id uri=$uri rows=$rows")
+                    if (rows > 0) return
+                } catch (e: Exception) {
+                    XposedBridge.log("HyperIsland: resume id=$id uri=$uri err=${e.message}")
+                }
             }
         }
         resumeAll(context)
+    }
+
+    /** 查询正在运行/等待的下载的真实 ID（和 cancelAll 同一策略）*/
+    private fun queryActiveIds(context: Context): List<Long> {
+        return try {
+            val dm = context.getSystemService(Context.DOWNLOAD_SERVICE) as? DownloadManager
+            val cursor = dm?.query(
+                DownloadManager.Query().setFilterByStatus(
+                    DownloadManager.STATUS_RUNNING or DownloadManager.STATUS_PENDING
+                )
+            )
+            val ids = mutableListOf<Long>()
+            cursor?.use {
+                val col = it.getColumnIndex(DownloadManager.COLUMN_ID)
+                while (it.moveToNext()) if (col >= 0) ids.add(it.getLong(col))
+            }
+            ids
+        } catch (e: Exception) {
+            XposedBridge.log("HyperIsland: queryActiveIds err=${e.message}")
+            emptyList()
+        }
+    }
+
+    /** 查询已暂停的下载的真实 ID */
+    private fun queryPausedIds(context: Context): List<Long> {
+        return try {
+            val dm = context.getSystemService(Context.DOWNLOAD_SERVICE) as? DownloadManager
+            val cursor = dm?.query(
+                DownloadManager.Query().setFilterByStatus(DownloadManager.STATUS_PAUSED)
+            )
+            val ids = mutableListOf<Long>()
+            cursor?.use {
+                val col = it.getColumnIndex(DownloadManager.COLUMN_ID)
+                while (it.moveToNext()) if (col >= 0) ids.add(it.getLong(col))
+            }
+            ids
+        } catch (e: Exception) {
+            XposedBridge.log("HyperIsland: queryPausedIds err=${e.message}")
+            emptyList()
+        }
     }
 
     private fun cancel(context: Context, downloadId: Long) {

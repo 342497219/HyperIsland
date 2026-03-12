@@ -33,9 +33,6 @@ object DownloadIslandNotification {
                 else android.R.drawable.stat_sys_download
             val downloadIcon = Icon.createWithResource(context, downloadIconRes)
 
-            // 确保进程内 Receiver 已注册
-            InProcessController.ensureRegistered(context)
-
             val pausePendingIntent  = InProcessController.pauseIntent(context, downloadId)
             val cancelPendingIntent = InProcessController.cancelIntent(context, downloadId)
 
@@ -58,11 +55,14 @@ object DownloadIslandNotification {
                                 type = 1
                                 pic = downloadIconKey
                             }
+                            textInfo {
+                                this.title = if isComplete "下载中$progress%" else 下载完成
+                            }
                         }
                         imageTextInfoRight {
                             type = 3
                             textInfo {
-                                this.title = if (progress >= 0) "$fileName $progress%" else fileName
+                                this.title = fileName
                             }
                         }
                     }

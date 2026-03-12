@@ -89,13 +89,15 @@ class DownloadHook : IXposedHookLoadPackage {
                         val fileName = extractFileName(title, text, extras)
                         val downloadId = extractDownloadId(extras)
                         val progress = extractProgress(title, text, extras)
-                        val key = "${lpparam.packageName}_${System.currentTimeMillis()}_${notif.hashCode()}"
+                        val key = "${lpparam.packageName}_${notif.hashCode()}"
                         val now = System.currentTimeMillis()
 
+                        var isNew = false
                         val info = processedNotifications.getOrPut(key) {
+                            isNew = true
                             NotificationInfo(progress, now, appName, downloadId)
                         }
-                        if (info.lastProgress == progress && now - info.lastProcessTime < 1000) return
+                        if (!isNew && info.lastProgress == progress) return
                         info.lastProgress = progress; info.lastProcessTime = now; info.appName = appName
                         if (downloadId > 0) { info.downloadId = downloadId; downloadIdMap[downloadId] = lpparam.packageName }
                         processedNotifications.entries.removeIf { now - it.value.lastProcessTime > 10000 }
@@ -108,7 +110,7 @@ class DownloadHook : IXposedHookLoadPackage {
 
                         val context = getContext(lpparam) ?: return
                         DownloadIslandNotification.inject(context, extras, title, text, progress, appName, fileName, downloadId, lpparam.packageName)
-                        extras.putBoolean("hyperisland_processed", true)
+                        // 不在此处设置 hyperisland_processed，让 Notify hook 继续运行设置 notif.actions
                     }
                 })
                 XposedBridge.log("HyperIsland: Hooked $builderClassName.build()")
@@ -158,8 +160,9 @@ class DownloadHook : IXposedHookLoadPackage {
             val key = "${lpparam.packageName}_${tag ?: "null"}_$id"
             val now = System.currentTimeMillis()
 
-            val info = processedNotifications.getOrPut(key) { NotificationInfo(progress, now, appName, downloadId) }
-            if (info.lastProgress == progress && now - info.lastProcessTime < 1000) return
+            var isNew = false
+            val info = processedNotifications.getOrPut(key) { isNew = true; NotificationInfo(progress, now, appName, downloadId) }
+            if (!isNew && info.lastProgress == progress) return
             info.lastProgress = progress; info.lastProcessTime = now; info.appName = appName
             if (downloadId > 0) { info.downloadId = downloadId; downloadIdMap[downloadId] = lpparam.packageName }
             processedNotifications.entries.removeIf { now - it.value.lastProcessTime > 10000 }
@@ -167,6 +170,27 @@ class DownloadHook : IXposedHookLoadPackage {
             XposedBridge.log("HyperIsland: [Notify] $appName | $fileName | $progress% | notifId=$id | tag=$tag | downloadId=$downloadId")
 
             val context = getContext(lpparam) ?: return
+            InProcessController.ensureRegistered(context)
+
+            // 把 pause/cancel 写入标准 notification.actions[]
+            // MIUI 超级岛点击按钮时，触发的是 actions[] 里的 PendingIntent
+            val isComplete = progress >= 100
+            val newActions = buildList {
+                if (!isComplete) {
+                    add(Notification.Action.Builder(
+                        Icon.createWithResource(context, android.R.drawable.ic_media_pause),
+                        "暂停",
+                        InProcessController.pauseIntent(context, downloadId)
+                    ).build())
+                }
+                add(Notification.Action.Builder(
+                    Icon.createWithResource(context, android.R.drawable.ic_delete),
+                    if (isComplete) "完成" else "取消",
+                    InProcessController.cancelIntent(context, downloadId)
+                ).build())
+            }
+            notif.actions = newActions.toTypedArray()
+
             DownloadIslandNotification.inject(context, extras, title, text, progress, appName, fileName, downloadId, lpparam.packageName)
             extras.putBoolean("hyperisland_processed", true)
 
@@ -228,11 +252,13 @@ class DownloadHook : IXposedHookLoadPackage {
     }
 
     private fun isDownloadNotification(title: String, text: String, extras: Bundle): Boolean =
-        extras.containsKey("extra_download_id") ||  // MiuiDownloadManager 真实 key
+        extras.containsKey("extra_download_id") ||       // MiuiDownloadManager 真实 key
+        extras.containsKey("extra_download_current_bytes") ||
         title.contains("正在下载") ||
         title.contains("下载", ignoreCase = true) ||
         title.contains("download", ignoreCase = true) ||
         text.contains("下载", ignoreCase = true) ||
+        text.contains("准备", ignoreCase = true) ||
         extras.containsKey("progress")
 
     private fun extractProgress(title: String, text: String, extras: Bundle): Int {
@@ -241,11 +267,15 @@ class DownloadHook : IXposedHookLoadPackage {
         val total   = extras.getLong("extra_download_total_bytes",   -1L)
         if (current >= 0 && total > 0) return ((current * 100) / total).toInt().coerceIn(0, 100)
 
+        // 下载完成检测
+        val combined = title + text
+        if (combined.contains("下载完成") || combined.contains("完成下载") || combined.contains("下载成功")) return 100
+
         // 通用字段降级
         extras.getInt("progress", -1).takeIf { it >= 0 }?.let { return it }
         extras.getInt("android.progress", -1).takeIf { it >= 0 }?.let { return it }
         extras.getInt("percent", -1).takeIf { it >= 0 }?.let { return it }
-        val m = Pattern.compile("(\\d+)%").matcher(title + text)
+        val m = Pattern.compile("(\\d+)%").matcher(combined)
         if (m.find()) return m.group(1)?.toIntOrNull() ?: -1
         return -1
     }
