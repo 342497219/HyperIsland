@@ -51,6 +51,7 @@ object InProcessController {
 
     /** 从 ContentProvider 加载的设置，在 ensureRegistered 时初始化 */
     @Volatile private var resumeNotificationEnabled = true
+    @Volatile var useHookAppIconEnabled = true
 
     /** 下载通知快照，供暂停后重建覆盖通知 */
     data class DownloadNotifSnapshot(
@@ -75,7 +76,8 @@ object InProcessController {
     /** 从 ContentProvider 加载所有设置，进程首次初始化时调用一次 */
     private fun loadSettings(context: Context) {
         resumeNotificationEnabled = readBooleanSetting(context, "pref_resume_notification", true)
-        XposedBridge.log("HyperIsland: settings loaded — resumeNotification=$resumeNotificationEnabled")
+        useHookAppIconEnabled = readBooleanSetting(context, "pref_use_hook_app_icon", true)
+        XposedBridge.log("HyperIsland: settings loaded — resumeNotification=$resumeNotificationEnabled useHookAppIcon=$useHookAppIconEnabled")
     }
 
     fun ensureRegistered(context: Context) {
@@ -443,6 +445,26 @@ object InProcessController {
             XposedBridge.log("HyperIsland: cancelPausedOverlay")
         } catch (e: Exception) {
             XposedBridge.log("HyperIsland: cancelPausedOverlay failed: ${e.message}")
+        }
+    }
+
+    /**
+     * 获取指定包名的应用启动图标，转换为 [Icon]。
+     * 失败时返回 null，由调用方降级到默认图标。
+     */
+    fun getAppIcon(context: Context, packageName: String): android.graphics.drawable.Icon? {
+        return try {
+            val drawable = context.packageManager.getApplicationIcon(packageName)
+            val w = drawable.intrinsicWidth.coerceAtLeast(1)
+            val h = drawable.intrinsicHeight.coerceAtLeast(1)
+            val bitmap = android.graphics.Bitmap.createBitmap(w, h, android.graphics.Bitmap.Config.ARGB_8888)
+            val canvas = android.graphics.Canvas(bitmap)
+            drawable.setBounds(0, 0, w, h)
+            drawable.draw(canvas)
+            android.graphics.drawable.Icon.createWithBitmap(bitmap)
+        } catch (e: Exception) {
+            XposedBridge.log("HyperIsland: getAppIcon($packageName) failed: ${e.message}")
+            null
         }
     }
 

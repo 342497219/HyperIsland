@@ -39,6 +39,18 @@ class _SettingsPageState extends State<SettingsPage> {
     }
   }
 
+  Future<void> _onUseHookAppIconChanged(bool value) async {
+    await _ctrl.setUseHookAppIcon(value);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('请重启作用域应用以使设置生效'),
+          duration: Duration(seconds: 4),
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -75,6 +87,25 @@ class _SettingsPageState extends State<SettingsPage> {
                       subtitle: const Text('显示一条通知，点击以继续下载，可能导致状态不同步'),
                       value: _ctrl.resumeNotification,
                       onChanged: _onResumeNotificationChanged,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16)),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  const SectionLabel('通知外观'),
+                  const SizedBox(height: 8),
+                  Card(
+                    elevation: 0,
+                    color: cs.surfaceContainerHighest,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16)),
+                    child: SwitchListTile(
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 4),
+                      title: const Text('使用应用图标'),
+                      subtitle: const Text('将通知图标强制替换为被 Hook 应用的图标'),
+                      value: _ctrl.useHookAppIcon,
+                      onChanged: _onUseHookAppIconChanged,
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(16)),
                     ),

@@ -100,6 +100,11 @@ class GenericProgressHook : IXposedHookLoadPackage {
 
             val context = getContext(lpparam) ?: return
 
+            val notifIcon = if (InProcessController.useHookAppIconEnabled)
+                InProcessController.getAppIcon(context, lpparam.packageName) ?: notif.smallIcon
+            else
+                notif.smallIcon
+
             GenericProgressIslandNotification.inject(
                 context     = context,
                 extras      = extras,
@@ -107,7 +112,7 @@ class GenericProgressHook : IXposedHookLoadPackage {
                 subtitle    = subtitle,
                 progress    = progressPercent,
                 actions     = actions,
-                notifIcon   = notif.smallIcon
+                notifIcon   = notifIcon
             )
 
             extras.putBoolean("hyperisland_generic_processed", true)

@@ -23,7 +23,8 @@ object DownloadIslandNotification {
         fileName: String,
         downloadId: Long,
         packageName: String,
-        isPaused: Boolean = false
+        isPaused: Boolean = false,
+        appIcon: Icon? = null
     ) {
         try {
             val isComplete = progress >= 100
@@ -48,7 +49,8 @@ object DownloadIslandNotification {
                 isPaused   -> 0xFFFF9800.toInt()  // 橙
                 else       -> 0xFF2196F3.toInt()  // 蓝
             }
-            val downloadIcon = Icon.createWithResource(context, downloadIconRes).apply { setTint(tintColor) }
+            val fallbackIcon = Icon.createWithResource(context, downloadIconRes).apply { setTint(tintColor) }
+            val downloadIcon = appIcon ?: fallbackIcon
 
             // 主按钮：暂停中→恢复，下载中→暂停
             val primaryIntent = when {
