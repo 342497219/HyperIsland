@@ -104,14 +104,19 @@ object DownloadIslandNotification {
                                 this.title = islandStateTitle
                             }
                         }
-                        progressTextInfo {
-                            textInfo {
-                                this.title = fileName
-                                narrowFont = true
+                        if (!isComplete && !isWaiting) {
+                            progressTextInfo {
+                                textInfo {
+                                    this.title = fileName
+                                    narrowFont = true
+                                }
                             }
-                            if (!isComplete && !isWaiting) {
-                                progressInfo {
-                                    this.progress = progress
+                        } else {
+                            imageTextInfoRight {
+                                type = 2
+                                textInfo {
+                                    this.title = fileName
+                                    narrowFont = true
                                 }
                             }
                         }

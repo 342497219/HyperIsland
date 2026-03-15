@@ -131,19 +131,25 @@ class GenericProgressHook : IXposedHookLoadPackage {
 
             val extras = notif.extras ?: return
 
-            // 跳过已处理的通知
-            if (extras.getBoolean("hyperisland_processed", false)) return
-            if (extras.getBoolean("hyperisland_generic_processed", false)) return
+            // ── 进度条检测（需先于 flag 检查，以便状态变化通知绕过缓存标记）────────
+            val progressMax    = extras.getInt(Notification.EXTRA_PROGRESS_MAX, 0)
+            val indeterminate  = extras.getBoolean(Notification.EXTRA_PROGRESS_INDETERMINATE, false)
+            val hasProgressBar = progressMax > 0 && !indeterminate
 
-            // ── 进度条检测 ────────────────────────────────────────────────────────
-            val progressMax = extras.getInt(Notification.EXTRA_PROGRESS_MAX, 0)
-            val indeterminate = extras.getBoolean(Notification.EXTRA_PROGRESS_INDETERMINATE, false)
-            if (progressMax <= 0 || indeterminate) return
+            // 跳过已处理的通知；无进度条（暂停/完成/等待）属于状态变化，需强制重新处理
+            if (hasProgressBar) {
+                if (extras.getBoolean("hyperisland_processed", false)) return
+                if (extras.getBoolean("hyperisland_generic_processed", false)) return
+            }
 
-            val progressRaw = extras.getInt(Notification.EXTRA_PROGRESS, -1)
-            if (progressRaw < 0) return
-
-            val progressPercent = (progressRaw * 100 / progressMax).coerceIn(0, 100)
+            val progressPercent: Int
+            if (hasProgressBar) {
+                val progressRaw = extras.getInt(Notification.EXTRA_PROGRESS, -1)
+                if (progressRaw < 0) return
+                progressPercent = (progressRaw * 100 / progressMax).coerceIn(0, 100)
+            } else {
+                progressPercent = -1   // 无进度条，交给模板通过文本判断具体状态
+            }
 
             // ── 提取标题 / 副标题 ─────────────────────────────────────────────────
             val title = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString()

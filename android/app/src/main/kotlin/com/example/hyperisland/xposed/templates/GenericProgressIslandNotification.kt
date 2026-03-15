@@ -97,15 +97,40 @@ object GenericProgressIslandNotification : IslandTemplate {
         displayIcon: Icon?,
     ) {
         try {
-            val isComplete = progress >= 100
+            val combined   = "$title $subtitle"
+            val isComplete = progress >= 100 ||
+                combined.contains("完成") || combined.contains("成功") ||
+                combined.contains("complete", ignoreCase = true) ||
+                combined.contains("finished", ignoreCase = true) ||
+                combined.contains("done",     ignoreCase = true)
+            val isPaused   = !isComplete && (
+                combined.contains("暂停") || combined.contains("已暂停") || combined.contains("暂停中") ||
+                combined.contains("paused", ignoreCase = true)
+            )
+            val isWaiting  = !isComplete && !isPaused && (
+                combined.contains("等待") || combined.contains("准备中") ||
+                combined.contains("队列") || combined.contains("排队") ||
+                combined.contains("pending",  ignoreCase = true) ||
+                combined.contains("queued",   ignoreCase = true) ||
+                combined.contains("waiting",  ignoreCase = true)
+            )
 
-            val stateLabel     = if (isComplete) "已完成" else "下载中"
+            val stateLabel = when {
+                isComplete -> "已完成"
+                isPaused   -> "已暂停"
+                isWaiting  -> "等待中"
+                else       -> "下载中"
+            }
             val rightContent   = pickContent(title, subtitle)
             val displayContent = subtitle.ifEmpty { title }
 
-            val iconRes      = if (isComplete) android.R.drawable.stat_sys_download_done
-                               else            android.R.drawable.stat_sys_download
-            val tintColor    = if (isComplete) 0xFF4CAF50.toInt() else 0xFF2196F3.toInt()
+            val iconRes   = if (isComplete) android.R.drawable.stat_sys_download_done
+                            else            android.R.drawable.stat_sys_download
+            val tintColor = when {
+                isComplete          -> 0xFF4CAF50.toInt()  // 绿
+                isPaused || isWaiting -> 0xFFFF9800.toInt()  // 橙
+                else                -> 0xFF2196F3.toInt()  // 蓝
+            }
             val fallbackIcon = Icon.createWithResource(context, iconRes).apply { setTint(tintColor) }
             val displayIcon  = displayIcon ?: fallbackIcon
 
@@ -114,7 +139,7 @@ object GenericProgressIslandNotification : IslandTemplate {
 
                 islandFirstFloat = false
                 enableFloat      = false
-                updatable        = !isComplete
+                updatable        = !isComplete && !isPaused
 
                 island {
                     islandProperty = 1
@@ -129,14 +154,22 @@ object GenericProgressIslandNotification : IslandTemplate {
                                 this.title = stateLabel
                             }
                         }
-                        progressTextInfo {
-                            textInfo {
-                                this.title = rightContent
-                                narrowFont = true
-                            }
-                            if (!isComplete) {
+                        if (!isComplete && !isPaused && !isWaiting) {
+                            progressTextInfo {
+                                textInfo {
+                                    this.title = rightContent
+                                    narrowFont = true
+                                }
                                 progressInfo {
                                     this.progress = progress
+                                }
+                            }
+                        } else {
+                            imageTextInfoRight {
+                                type = 2
+                                textInfo {
+                                    this.title = rightContent
+                                    narrowFont = true
                                 }
                             }
                         }
@@ -145,6 +178,11 @@ object GenericProgressIslandNotification : IslandTemplate {
                         picInfo {
                             type = 1
                             pic  = iconKey
+                        }
+                        if (!isComplete && !isPaused && !isWaiting) {
+                            progressInfo {
+                                this.progress = progress
+                            }
                         }
                     }
                 }
@@ -159,7 +197,7 @@ object GenericProgressIslandNotification : IslandTemplate {
                 }
 
                 val effectiveActions = actions.take(2)
-                if (!isComplete && effectiveActions.isNotEmpty()) {
+                if (!isComplete && !isPaused && !isWaiting && effectiveActions.isNotEmpty()) {
                     textButton {
                         effectiveActions.forEachIndexed { index, action ->
                             addActionInfo {
@@ -180,7 +218,12 @@ object GenericProgressIslandNotification : IslandTemplate {
 
             extras.putAll(islandExtras)
 
-            val stateTag = if (isComplete) "done" else "${progress}%"
+            val stateTag = when {
+                isComplete -> "done"
+                isPaused   -> "paused"
+                isWaiting  -> "waiting"
+                else       -> "${progress}%"
+            }
             XposedBridge.log("HyperIsland[Generic]: Island injected — $title ($stateTag) buttons=${actions.size}")
 
         } catch (e: Exception) {
