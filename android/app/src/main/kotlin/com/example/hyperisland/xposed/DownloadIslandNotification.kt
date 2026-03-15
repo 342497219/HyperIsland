@@ -89,7 +89,7 @@ object DownloadIslandNotification {
 
                 islandFirstFloat = false
                 enableFloat = false
-                updatable = true
+                updatable = !isComplete  // 完成时不再等待后续更新，岛展示后自动消退
 
                 // 小米岛 摘要态
                 island {

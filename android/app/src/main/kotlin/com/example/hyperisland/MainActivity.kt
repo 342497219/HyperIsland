@@ -1,7 +1,10 @@
 package com.example.hyperisland
 
 import android.Manifest
+import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.Canvas
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
@@ -11,6 +14,7 @@ import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.MethodCall
+import java.io.ByteArrayOutputStream
 
 class MainActivity : FlutterActivity() {
     private val CHANNEL = "com.example.hyperisland/test"
@@ -80,6 +84,33 @@ class MainActivity : FlutterActivity() {
                     }
                 }
 
+                "getInstalledApps" -> {
+                    Thread {
+                        val apps = getInstalledUserApps()
+                        runOnUiThread { result.success(apps) }
+                    }.start()
+                }
+
+                "restartProcesses" -> {
+                    val commands = call.argument<List<String>>("commands") ?: emptyList()
+                    Thread {
+                        try {
+                            // 通过 stdin 写命令，兼容 Magisk / KernelSU / APatch
+                            val process = Runtime.getRuntime().exec("su")
+                            val writer = java.io.DataOutputStream(process.outputStream)
+                            for (cmd in commands) {
+                                writer.writeBytes("$cmd\n")
+                            }
+                            writer.writeBytes("exit\n")
+                            writer.flush()
+                            process.waitFor()
+                            runOnUiThread { result.success(true) }
+                        } catch (e: Exception) {
+                            runOnUiThread { result.error("ROOT_ERROR", e.message, null) }
+                        }
+                    }.start()
+                }
+
                 "isModuleActive" -> {
                     result.success(isModuleActive())
                 }
@@ -102,6 +133,32 @@ class MainActivity : FlutterActivity() {
 
     // 默认返回 false；LSPosed Hook 加载后会将此方法替换为返回 true
     fun isModuleActive(): Boolean = false
+
+    /** 返回所有已安装应用（排除自身），每项含 packageName / appName / icon（PNG bytes）。*/
+    private fun getInstalledUserApps(): List<Map<String, Any>> {
+        val pm = packageManager
+        return pm.getInstalledApplications(0)
+            .filter { it.packageName != packageName }
+            .mapNotNull { app ->
+                try {
+                    val label    = pm.getApplicationLabel(app).toString()
+                    val drawable = pm.getApplicationIcon(app.packageName)
+                    val size = 96
+                    val bmp = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+                    val canvas = Canvas(bmp)
+                    drawable.setBounds(0, 0, size, size)
+                    drawable.draw(canvas)
+                    val stream = ByteArrayOutputStream()
+                    bmp.compress(Bitmap.CompressFormat.PNG, 90, stream)
+                    mapOf(
+                        "packageName" to app.packageName,
+                        "appName"     to label,
+                        "icon"        to stream.toByteArray()
+                    )
+                } catch (_: Exception) { null }
+            }
+            .sortedBy { it["appName"] as String }
+    }
 
     private fun checkNotificationPermission(): Boolean {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {

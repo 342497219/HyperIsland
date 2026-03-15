@@ -28,10 +28,19 @@ class SettingsProvider : ContentProvider() {
         selectionArgs: Array<String>?, sortOrder: String?
     ): Cursor {
         // URI 格式: content://com.example.hyperisland.settings/<key>
-        val key = "flutter.${uri.lastPathSegment}"
+        val segment = uri.lastPathSegment ?: return MatrixCursor(arrayOf("value"))
+        val flutterKey = "flutter.$segment"
         val cursor = MatrixCursor(arrayOf("value"))
-        val value = if (prefs.contains(key)) {
-            try { if (prefs.getBoolean(key, true)) 1 else 0 }
+
+        // 字符串类型的 key（白名单等），直接返回字符串值
+        if (segment == "pref_generic_whitelist") {
+            cursor.newRow().add(prefs.getString(flutterKey, "") ?: "")
+            return cursor
+        }
+
+        // 布尔类型的 key，返回 1/0
+        val value = if (prefs.contains(flutterKey)) {
+            try { if (prefs.getBoolean(flutterKey, true)) 1 else 0 }
             catch (_: ClassCastException) { 1 }
         } else {
             1 // 默认开启

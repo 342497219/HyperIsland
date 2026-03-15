@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../controllers/home_controller.dart';
 import '../widgets/section_label.dart';
+
+const _channel = MethodChannel('com.example.hyperisland/test');
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -11,6 +14,7 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   late final HomeController _ctrl;
+  bool _restarting = false;
 
   @override
   void initState() {
@@ -27,6 +31,75 @@ class _HomePageState extends State<HomePage> {
     super.dispose();
   }
 
+  Future<void> _showRestartDialog() async {
+    bool restartSystemUI = true;
+    bool restartDownloadManager = false;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: const Text('重启作用域'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CheckboxListTile(
+                title: const Text('系统界面'),
+                subtitle: const Text('com.android.systemui'),
+                value: restartSystemUI,
+                onChanged: (v) =>
+                    setDialogState(() => restartSystemUI = v ?? false),
+                controlAffinity: ListTileControlAffinity.leading,
+                contentPadding: EdgeInsets.zero,
+              ),
+              CheckboxListTile(
+                title: const Text('下载管理器'),
+                subtitle: const Text('com.android.providers.downloads'),
+                value: restartDownloadManager,
+                onChanged: (v) =>
+                    setDialogState(() => restartDownloadManager = v ?? false),
+                controlAffinity: ListTileControlAffinity.leading,
+                contentPadding: EdgeInsets.zero,
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('取消'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('确认'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (confirmed != true) return;
+    if (!restartSystemUI && !restartDownloadManager) return;
+
+    setState(() => _restarting = true);
+    try {
+      final commands = <String>[];
+      if (restartSystemUI) commands.add('killall com.android.systemui');
+      if (restartDownloadManager) {
+        commands.add('killall com.android.providers.downloads');
+        commands.add('killall com.xiaomi.android.app.downloadmanager');
+      }
+      await _channel.invokeMethod('restartProcesses', {'commands': commands});
+    } on PlatformException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('重启失败：${e.message}')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _restarting = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -39,6 +112,22 @@ class _HomePageState extends State<HomePage> {
             title: const Text('HyperIsland'),
             backgroundColor: cs.surface,
             centerTitle: false,
+            actions: [
+              _restarting
+                  ? const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 16),
+                      child: SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    )
+                  : IconButton(
+                      tooltip: '重启作用域',
+                      icon: const Icon(Icons.restart_alt),
+                      onPressed: _showRestartDialog,
+                    ),
+            ],
           ),
           SliverPadding(
             padding: const EdgeInsets.symmetric(horizontal: 16),

@@ -1,7 +1,7 @@
 package com.example.hyperisland.xposed
 
 import android.app.Notification
-import android.os.Bundle
+import android.service.notification.StatusBarNotification
 import de.robv.android.xposed.IXposedHookLoadPackage
 import de.robv.android.xposed.XC_MethodHook
 import de.robv.android.xposed.XposedBridge
@@ -9,69 +9,95 @@ import de.robv.android.xposed.XposedHelpers
 import de.robv.android.xposed.callbacks.XC_LoadPackage
 
 /**
- * 通用进度条通知 Hook — 拦截任意 App 含进度条的通知，注入澎湃超级岛样式。
- * 与 DownloadHook 互不干扰：
- *   - 跳过 DownloadHook 已覆盖的下载管理器包
- *   - 跳过带 hyperisland_processed 标记的通知（DownloadHook 已处理）
- *   - 跳过不确定进度条（indeterminate）或无有效进度的通知
+ * 通用进度条通知 Hook — 在 SystemUI 进程内 Hook MiuiBaseNotifUtil.generateInnerNotifBean()。
+ *
+ * 调用链：
+ *   onNotificationPosted(sbn)
+ *     → mBgHandler.post（后台线程）
+ *         → generateInnerNotifBean(sbn)   ← ★ 此处最先读取 extras，快照进 InnerNotifBean
+ *         → mMainExecutor.execute
+ *             → extras.putParcelable("inner_notif_bean", innerNotifBean)
+ *             → NotificationHandler.onNotificationPosted（最终分发）
+ *
+ * 必须在 generateInnerNotifBean 之前（beforeHookedMethod）写入 island extras，
+ * 否则 bean 已经用原始 extras 创建完毕，后续修改不影响岛的触发判断。
+ *
+ * 通过白名单（包名 → 渠道集合）精确控制处理范围，空渠道集合表示该包全部渠道。
  */
 class GenericProgressHook : IXposedHookLoadPackage {
 
     companion object {
-        /** DownloadHook 已处理的包，此处跳过避免重复注入 */
-        private val SKIP_PACKAGES = setOf(
-            "com.example.hyperisland",
-            "com.android.providers.downloads",
-            "com.xiaomi.android.app.downloadmanager",
-            "com.android.mtp",
-            "com.android.providers.media"
-        )
-    }
+        // 白名单缓存：首次调用时从 SettingsProvider 加载，SystemUI 重启后自动刷新。
+        // 用户修改白名单后需重启 SystemUI 生效（与其他设置项行为一致）。
+        @Volatile private var cachedWhitelist: Map<String, Set<String>>? = null
 
-    override fun handleLoadPackage(lpparam: XC_LoadPackage.LoadPackageParam) {
-        if (lpparam.packageName in SKIP_PACKAGES) return
-
-        try {
-            val nmClass = lpparam.classLoader.loadClass("android.app.NotificationManager")
-            hookNotify(nmClass, lpparam, hasTag = true)
-            hookNotify(nmClass, lpparam, hasTag = false)
-        } catch (e: Throwable) {
-            // 大量包不含 NotificationManager，静默跳过
+        private fun loadWhitelist(context: android.content.Context): Map<String, Set<String>> {
+            cachedWhitelist?.let { return it }
+            return try {
+                val uri = android.net.Uri.parse(
+                    "content://com.example.hyperisland.settings/pref_generic_whitelist"
+                )
+                val csv = context.contentResolver.query(uri, null, null, null, null)
+                    ?.use { if (it.moveToFirst()) it.getString(0) else "" }
+                    ?: ""
+                val map = csv.split(",")
+                    .map { it.trim() }
+                    .filter { it.isNotBlank() }
+                    .associate { it to emptySet<String>() }
+                cachedWhitelist = map
+                XposedBridge.log("HyperIsland[Generic]: whitelist loaded (${map.size} apps): ${map.keys}")
+                map
+            } catch (e: Exception) {
+                XposedBridge.log("HyperIsland[Generic]: loadWhitelist failed: ${e.message}")
+                emptyMap()
+            }
         }
     }
 
-    private fun hookNotify(
-        nmClass: Class<*>,
-        lpparam: XC_LoadPackage.LoadPackageParam,
-        hasTag: Boolean
-    ) {
-        try {
-            val paramTypes = if (hasTag)
-                arrayOf(String::class.java, Int::class.javaPrimitiveType, Notification::class.java)
-            else
-                arrayOf(Int::class.javaPrimitiveType, Notification::class.java)
+    override fun handleLoadPackage(lpparam: XC_LoadPackage.LoadPackageParam) {
+        if (lpparam.packageName != "com.android.systemui") return
 
-            XposedHelpers.findAndHookMethod(nmClass, "notify", *paramTypes, object : XC_MethodHook() {
-                override fun beforeHookedMethod(param: MethodHookParam) {
-                    val notif = (if (hasTag) param.args[2] else param.args[1]) as? Notification ?: return
-                    handleNotification(notif, lpparam)
+        try {
+            XposedHelpers.findAndHookMethod(
+                "com.miui.systemui.notification.MiuiBaseNotifUtil",
+                lpparam.classLoader,
+                "generateInnerNotifBean",
+                StatusBarNotification::class.java,
+                object : XC_MethodHook() {
+                    override fun beforeHookedMethod(param: MethodHookParam) {
+                        val sbn = param.args[0] as? StatusBarNotification ?: return
+                        handleSbn(sbn, lpparam)
+                    }
                 }
-            })
-        } catch (_: Throwable) {}
+            )
+            XposedBridge.log("HyperIsland[Generic]: hooked MiuiBaseNotifUtil.generateInnerNotifBean")
+        } catch (e: Throwable) {
+            XposedBridge.log("HyperIsland[Generic]: hook failed: ${e.message}")
+        }
     }
 
-    private fun handleNotification(notif: Notification, lpparam: XC_LoadPackage.LoadPackageParam) {
+    private fun handleSbn(sbn: StatusBarNotification, lpparam: XC_LoadPackage.LoadPackageParam) {
         try {
-            val extras = DownloadHook.extrasField?.get(notif) as? Bundle ?: return
+            val pkg = sbn.packageName ?: return
 
-            // 跳过已被 DownloadHook 或本 Hook 处理过的通知
+            // 先取 context，用于加载白名单
+            val context = getContext(lpparam) ?: return
+
+            // 白名单检查（动态从 SettingsProvider 读取）
+            val allowedChannels = loadWhitelist(context)[pkg] ?: return
+            val notif = sbn.notification ?: return
+            val channelId = notif.channelId ?: ""
+            if (allowedChannels.isNotEmpty() && channelId !in allowedChannels) return
+
+            val extras = notif.extras ?: return
+
+            // 跳过已处理的通知
             if (extras.getBoolean("hyperisland_processed", false)) return
             if (extras.getBoolean("hyperisland_generic_processed", false)) return
 
             // ── 进度条检测 ────────────────────────────────────────────────────────
             val progressMax = extras.getInt(Notification.EXTRA_PROGRESS_MAX, 0)
             val indeterminate = extras.getBoolean(Notification.EXTRA_PROGRESS_INDETERMINATE, false)
-            // 必须有确定的进度条（max > 0 且非不确定）
             if (progressMax <= 0 || indeterminate) return
 
             val progressRaw = extras.getInt(Notification.EXTRA_PROGRESS, -1)
@@ -82,9 +108,8 @@ class GenericProgressHook : IXposedHookLoadPackage {
             // ── 提取标题 / 副标题 ─────────────────────────────────────────────────
             val title = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString()
                 ?: extras.getCharSequence(Notification.EXTRA_TITLE_BIG)?.toString()
-                ?: return   // 无标题则不处理
+                ?: return
 
-            // 副标题优先级：subText > text > infoText > bigText
             val subtitle = listOf(
                 extras.getCharSequence(Notification.EXTRA_SUB_TEXT),
                 extras.getCharSequence(Notification.EXTRA_TEXT),
@@ -92,35 +117,31 @@ class GenericProgressHook : IXposedHookLoadPackage {
                 extras.getCharSequence(Notification.EXTRA_BIG_TEXT)
             ).firstNotNullOfOrNull { it?.toString()?.takeIf { s -> s.isNotEmpty() } } ?: ""
 
-            // ── 提取原通知按钮（最多 2 个）────────────────────────────────────────
             val actions: List<Notification.Action> = notif.actions?.take(2) ?: emptyList()
 
             XposedBridge.log(
-                "HyperIsland[Generic]: ${lpparam.packageName} | " +
-                "$title | $progressPercent% | buttons=${actions.size}"
+                "HyperIsland[Generic]: $pkg/$channelId | $title | $progressPercent% | buttons=${actions.size}"
             )
 
-            val context = getContext(lpparam) ?: return
-
             val notifIcon = if (InProcessController.useHookAppIconEnabled)
-                InProcessController.getAppIcon(context, lpparam.packageName) ?: notif.smallIcon
+                InProcessController.getAppIcon(context, pkg) ?: notif.smallIcon
             else
                 notif.smallIcon
 
             GenericProgressIslandNotification.inject(
-                context     = context,
-                extras      = extras,
-                title       = title,
-                subtitle    = subtitle,
-                progress    = progressPercent,
-                actions     = actions,
-                notifIcon   = notifIcon
+                context   = context,
+                extras    = extras,
+                title     = title,
+                subtitle  = subtitle,
+                progress  = progressPercent,
+                actions   = actions,
+                notifIcon = notifIcon
             )
 
             extras.putBoolean("hyperisland_generic_processed", true)
 
         } catch (e: Throwable) {
-            XposedBridge.log("HyperIsland[Generic]: handleNotification error: ${e.message}")
+            XposedBridge.log("HyperIsland[Generic]: handleSbn error: ${e.message}")
         }
     }
 
