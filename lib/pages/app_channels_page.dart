@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../controllers/whitelist_controller.dart';
 import '../widgets/channel_settings_dialog.dart';
 
@@ -36,14 +37,24 @@ class _AppChannelsPageState extends State<AppChannelsPage> {
 
   Future<void> _load() async {
     final pkg = widget.app.packageName;
+
+    List<ChannelInfo> channels;
+    bool rootError = false;
+    try {
+      channels = await widget.controller.getChannels(pkg);
+    } on PlatformException catch (e) {
+      channels = [];
+      if (e.code == 'ROOT_REQUIRED') rootError = true;
+    } catch (_) {
+      channels = [];
+    }
+
     final results = await Future.wait([
-      widget.controller.getChannels(pkg),
       widget.controller.getEnabledChannels(pkg),
       widget.controller.getTemplates(),
     ]);
-    final channels      = results[0] as List<ChannelInfo>;
-    final enabled       = results[1] as Set<String>;
-    final templateLabels = results[2] as Map<String, String>;
+    final enabled        = results[0] as Set<String>;
+    final templateLabels = results[1] as Map<String, String>;
     final channelIds = channels.map((c) => c.id).toList();
     final channelTemplates = await widget.controller.getChannelTemplates(pkg, channelIds);
     final channelExtras    = await widget.controller.getChannelExtraSettings(pkg, channelIds);
@@ -56,7 +67,27 @@ class _AppChannelsPageState extends State<AppChannelsPage> {
         _channelExtras    = channelExtras;
         _loading          = false;
       });
+      if (rootError) {
+        WidgetsBinding.instance.addPostFrameCallback((_) => _showRootErrorDialog());
+      }
     }
+  }
+
+  void _showRootErrorDialog() {
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('无法读取通知渠道'),
+        content: const Text('读取通知渠道需要 ROOT 权限。\n请确认已授予本应用 ROOT 权限后重试。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('确定'),
+          ),
+        ],
+      ),
+    );
   }
 
   /// 渠道是否生效：应用总开关关闭时强制返回 false。

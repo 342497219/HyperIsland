@@ -123,6 +123,7 @@ class WhitelistController extends ChangeNotifier {
   // ── 渠道管理 ──────────────────────────────────────────────────────────────
 
   /// 获取指定包的通知渠道列表（调用原生）。
+  /// 若读取失败（ROOT权限不足），抛出 [PlatformException]，code 为 'ROOT_REQUIRED'。
   Future<List<ChannelInfo>> getChannels(String packageName) async {
     try {
       final rawList = await _channel.invokeMethod<List<dynamic>>(
@@ -137,6 +138,8 @@ class WhitelistController extends ChangeNotifier {
           importance: map['importance'] as int? ?? 3,
         );
       }).toList();
+    } on PlatformException {
+      rethrow;
     } catch (e) {
       debugPrint('getChannels error: $e');
       return [];

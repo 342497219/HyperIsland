@@ -81,7 +81,7 @@ object HyperIslandHelper {
                         val textInfo = JSONObject().apply {
                             put("frontTitle", if (isIndeterminate) "准备中" else if (progress >= 100) "完成" else "下载中")
                             put("title", if (progress >= 0) "$progress%" else content)
-                            put("content", if (isIndeterminate) "正在连接..." else "正在下载")
+                            put("content", "仅供测试")
                             put("useHighLight", progress >= 100)
                         }
                         put("textInfo", textInfo)
@@ -110,7 +110,7 @@ object HyperIslandHelper {
 
             // 焦点通知数据
             val baseInfo = JSONObject().apply {
-                put("title", title)
+                put("title", "仅供测试")
                 put("content", content)
                 put("colorTitle", "#006EFF")
                 put("type", 2)

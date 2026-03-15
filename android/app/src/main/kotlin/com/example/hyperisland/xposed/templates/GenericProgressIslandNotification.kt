@@ -110,7 +110,7 @@ object GenericProgressIslandNotification : IslandTemplate {
         timeoutSecs: Int,
     ) {
         try {
-            val combined   = "$title $subtitle"
+            val combined   = "$title $subtitle "
             val isComplete = progress >= 100 ||
                 combined.contains("完成") || combined.contains("成功") ||
                 combined.contains("complete", ignoreCase = true) ||

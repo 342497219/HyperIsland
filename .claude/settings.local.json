@@ -10,7 +10,9 @@
       "Bash(find /c/Users/1812z/Documents/GitHub/hyperisland -type f \\\\\\( -name \"*.kt\" -o -name \"*.gradle\" \\\\\\) 2>/dev/null | head -30)",
       "Bash(cd \"C:\\\\Users\\\\1812z\\\\Documents\\\\GitHub\\\\hyperisland\" && flutter pub get 2>&1)",
       "WebFetch(domain:github.com)",
-      "WebFetch(domain:raw.githubusercontent.com)"
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Read(//mnt/c/Users/1812z/Documents/GitHub/**)",
+      "Bash(flutter pub:*)"
     ]
   }
 }

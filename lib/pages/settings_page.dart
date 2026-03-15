@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../controllers/settings_controller.dart';
 import '../widgets/section_label.dart';
 
@@ -130,6 +132,58 @@ class _SettingsPageState extends State<SettingsPage> {
                     ),
                   ),
                   const SizedBox(height: 24),
+                  const SectionLabel('关于'),
+                  const SizedBox(height: 8),
+                  Card(
+                    elevation: 0,
+                    color: cs.surfaceContainerHighest,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16)),
+                    child: Column(
+                      children: [
+                        ListTile(
+                          shape: const RoundedRectangleBorder(
+                              borderRadius: BorderRadius.vertical(
+                                  top: Radius.circular(16),
+                                  bottom: Radius.circular(16))),
+                          leading: const Icon(Icons.code),
+                          title: const Text('GitHub'),
+                          subtitle: const Text('1812z/HyperIsland'),
+                          trailing: const Icon(Icons.open_in_new, size: 18),
+                          onTap: () => launchUrl(
+                            Uri.parse('https://github.com/1812z/HyperIsland'),
+                            mode: LaunchMode.externalApplication,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Card(
+                    elevation: 0,
+                    color: cs.surfaceContainerHighest,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16)),
+                    child: ListTile(
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16)),
+                      leading: const Icon(Icons.group_outlined),
+                      title: const Text('QQ 交流群'),
+                      subtitle: const Text('1045114341'),
+                      trailing: const Icon(Icons.copy, size: 18),
+                      onTap: () {
+                        Clipboard.setData(
+                            const ClipboardData(text: '1045114341'));
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('群号已复制到剪贴板'),
+                            duration: Duration(seconds: 2),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 32),
                 ]),
               ),
             ),

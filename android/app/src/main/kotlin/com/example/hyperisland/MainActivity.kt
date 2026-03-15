@@ -100,7 +100,13 @@ class MainActivity : FlutterActivity() {
                     val pkg = call.argument<String>("packageName") ?: ""
                     Thread {
                         val channels = getNotificationChannelsForPackage(pkg)
-                        runOnUiThread { result.success(channels) }
+                        runOnUiThread {
+                            if (channels == null) {
+                                result.error("ROOT_REQUIRED", "无法读取通知渠道，请检查ROOT权限", null)
+                            } else {
+                                result.success(channels)
+                            }
+                        }
                     }.start()
                 }
 
@@ -153,20 +159,23 @@ class MainActivity : FlutterActivity() {
      * 通知渠道持久化在 /data/system/notification_policy.xml，
      * 用 root 读取后用 XmlPullParser 解析，无需调用任何受限 API。
      */
-    private fun getNotificationChannelsForPackage(pkg: String): List<Map<String, Any?>> {
+    private fun getNotificationChannelsForPackage(pkg: String): List<Map<String, Any?>>? {
         if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.O) return emptyList()
         return tryGetChannelsFromPolicyFile(pkg)
     }
 
-    private fun tryGetChannelsFromPolicyFile(pkg: String): List<Map<String, Any?>> {
+    private fun tryGetChannelsFromPolicyFile(pkg: String): List<Map<String, Any?>>? {
         return try {
             val xml = convertAbxPolicyToXml()
-            if (xml.isEmpty()) { Log.w(TAG, "convertAbxPolicyToXml: empty"); return emptyList() }
+            if (xml.isEmpty()) {
+                Log.w(TAG, "convertAbxPolicyToXml: empty (ROOT权限不足?)")
+                return null
+            }
             Log.d(TAG, "policy xml: ${xml.length} chars")
             parseTextXmlChannels(xml.toByteArray(Charsets.UTF_8), pkg)
         } catch (e: Exception) {
             Log.e(TAG, "tryGetChannelsFromPolicyFile: ${e.message}")
-            emptyList()
+            null
         }
     }
 
