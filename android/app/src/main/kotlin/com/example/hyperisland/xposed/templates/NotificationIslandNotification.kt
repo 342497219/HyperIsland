@@ -34,6 +34,7 @@ object NotificationIslandNotification : IslandTemplate {
         notifIcon       = data.notifIcon,
         largeIcon       = data.largeIcon,
         appIconRaw      = data.appIconRaw,
+        iconMode        = data.iconMode,
         focusNotif      = data.focusNotif,
         firstFloat      = data.firstFloat,
         enableFloatMode = data.enableFloatMode,
@@ -50,6 +51,7 @@ object NotificationIslandNotification : IslandTemplate {
         notifIcon: Icon?,
         largeIcon: Icon?,
         appIconRaw: Icon?,
+        iconMode: String?,
         focusNotif: String,
         firstFloat: String,
         enableFloatMode: String,
@@ -57,9 +59,13 @@ object NotificationIslandNotification : IslandTemplate {
         isOngoing: Boolean,
     ) {
         try {
-            val displayIcon = (largeIcon ?: notifIcon ?: appIconRaw
-                ?: Icon.createWithResource(context, android.R.drawable.ic_dialog_info))
-                .toRounded(context)
+            val fallbackIcon = Icon.createWithResource(context, android.R.drawable.ic_dialog_info)
+            val displayIcon  = when (iconMode) {
+                "notif_small" -> notifIcon ?: fallbackIcon
+                "notif_large" -> largeIcon ?: notifIcon ?: fallbackIcon
+                "app_icon"    -> appIconRaw ?: fallbackIcon
+                else          -> notifIcon ?: largeIcon ?: fallbackIcon  // auto
+            }.toRounded(context)
 
             val leftText       = title
             val rightContent   = subtitle.ifEmpty { title }
@@ -141,7 +147,7 @@ object NotificationIslandNotification : IslandTemplate {
             extras.putAll(islandExtras)
 
             XposedBridge.log(
-                "HyperIsland[NotifIsland]: Island injected — $title | left=$leftText | right=$rightContent | buttons=${actions.size}"
+                "HyperIsland[NotifIsland]: Island injected — $title | left=$leftText | right=$rightContent | buttons=${actions.size} | isOngoing=${isOngoing}"
             )
 
         } catch (e: Exception) {
