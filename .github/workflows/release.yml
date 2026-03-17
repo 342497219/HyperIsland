@@ -7,6 +7,16 @@ on:
     branches: [main]
   # 手动触发：在 GitHub Actions 页面可以手动运行此工作流
   workflow_dispatch:
+    inputs:
+      version:
+        description: '版本号（格式：1.5.0）'
+        required: false
+        type: string
+      build_only:
+        description: '仅构建不发布'
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   build:
@@ -27,25 +37,36 @@ jobs:
       - name: Detect version change
         id: version
         run: |
-          # 从 pubspec.yaml 中提取当前版本号（格式：1.5.0+2）
-          CURRENT=$(grep '^version:' pubspec.yaml | awk '{print $2}')
+          # 1. 优先获取手动输入的版本，如果没有则从 pubspec.yaml 提取
+          INPUT_VERSION="${{ github.event.inputs.version }}"
+          CURRENT_FULL=$(grep '^version:' pubspec.yaml | awk '{print $2}')
+          CURRENT_NAME=$(echo "$CURRENT_FULL" | cut -d'+' -f1)
+          CURRENT_CODE=$(echo "$CURRENT_FULL" | cut -d'+' -f2)
 
-          # 从上一个提交的 pubspec.yaml 中提取版本号（如果不存在则为空）
-          PREVIOUS=$(git show HEAD~1:pubspec.yaml 2>/dev/null | grep '^version:' | awk '{print $2}' || echo "")
+          VERSION_NAME=${INPUT_VERSION:-$CURRENT_NAME}
+          VERSION_CODE=$CURRENT_CODE
 
-          # 分离版本名称（1.5.0）和版本代码（2）
-          # 格式：versionName+versionCode
-          VERSION_NAME=$(echo "$CURRENT" | cut -d'+' -f1)
-          VERSION_CODE=$(echo "$CURRENT" | cut -d'+' -f2)
-          PREVIOUS_VERSION_NAME=$(echo "$PREVIOUS" | cut -d'+' -f1)
+          # 2. 判断是否发布
+          # 如果手动指定了 build_only=true，则强制不发布
+          # 否则，根据版本是否变更来决定
+          PREVIOUS_FULL=$(git show HEAD~1:pubspec.yaml 2>/dev/null | grep '^version:' | awk '{print $2}' || echo "")
+          PREVIOUS_NAME=$(echo "$PREVIOUS_FULL" | cut -d'+' -f1)
 
-          # 判断版本是否变更
-          if [ "$CURRENT" != "$PREVIOUS" ] && [ -n "$CURRENT" ]; then
+          SHOULD_RELEASE="true"
+          if [[ "${{ github.event.inputs.build_only }}" == "true" ]]; then
+            SHOULD_RELEASE="false"
+            echo "::notice::Build only mode enabled via input."
+          elif [[ "$VERSION_NAME" == "$PREVIOUS_NAME" ]]; then
+            SHOULD_RELEASE="false"
+            echo "::notice::No version name change detected ($PREVIOUS_NAME -> $VERSION_NAME)."
+          fi
+
+          if [ "$SHOULD_RELEASE" == "true" ]; then
             # 版本已变更，标记为 true，后续会发布 Release
             echo "changed=true" >> $GITHUB_OUTPUT
             echo "build_version_name=$VERSION_NAME" >> $GITHUB_OUTPUT
             echo "build_version_code=$VERSION_CODE" >> $GITHUB_OUTPUT
-            echo "::notice::Version changed: $PREVIOUS → $CURRENT, will release."
+            echo "::notice::Version $VERSION_NAME will be released."
           else
             # 版本未变更，标记为 false，只编译不发布
             # versionCode 递增，versionName 添加 -dev 后缀
@@ -53,13 +74,13 @@ jobs:
             echo "changed=false" >> $GITHUB_OUTPUT
             echo "build_version_name=$VERSION_NAME-dev" >> $GITHUB_OUTPUT
             echo "build_version_code=$NEW_VERSION_CODE" >> $GITHUB_OUTPUT
-            echo "::notice::No version change ($CURRENT), build only with dev suffix."
+            echo "::notice::Build only version: $VERSION_NAME-dev+$NEW_VERSION_CODE"
           fi
 
           # 输出原始版本信息供后续步骤使用
           echo "version_name=$VERSION_NAME" >> $GITHUB_OUTPUT
           echo "version_code=$VERSION_CODE"  >> $GITHUB_OUTPUT
-          echo "previous_version=$PREVIOUS_VERSION_NAME" >> $GITHUB_OUTPUT
+          echo "previous_version=$PREVIOUS_NAME" >> $GITHUB_OUTPUT
 
       # 第三步：安装 Java 环境
       # Flutter 编译 Android 需要 Java 17
