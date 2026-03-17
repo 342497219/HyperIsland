@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../controllers/whitelist_controller.dart';
 
 // ── 应用范围（sealed class）─────────────────────────────────────────────────
@@ -94,7 +95,35 @@ class _BatchChannelSettingsSheetState
   // 仅 SingleAppScope 下使用
   bool _onlyEnabled = false;
 
-  static const _timeoutOptions = [3, 5, 10, 30, 60, 300, 1800, 3600];
+  final _scrollController   = ScrollController();
+  final _timeoutController  = TextEditingController();
+  final _timeoutFocusNode   = FocusNode();
+
+  @override
+  void initState() {
+    super.initState();
+    _timeoutFocusNode.addListener(() {
+      if (_timeoutFocusNode.hasFocus) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (_scrollController.hasClients) {
+            _scrollController.animateTo(
+              _scrollController.position.maxScrollExtent,
+              duration: const Duration(milliseconds: 280),
+              curve: Curves.easeOut,
+            );
+          }
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    _timeoutController.dispose();
+    _timeoutFocusNode.dispose();
+    super.dispose();
+  }
 
   bool get _hasAnyChange =>
       _template != null ||
@@ -180,6 +209,7 @@ class _BatchChannelSettingsSheetState
           // ── 可滚动内容区 ─────────────────────────────────────────────────
           Flexible(
             child: SingleChildScrollView(
+              controller: _scrollController,
               padding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -283,16 +313,44 @@ class _BatchChannelSettingsSheetState
                   const SizedBox(height: 12),
 
                   // 自动消失
-                  _BatchSettingRow(
-                    label: '自动消失',
-                    value: _islandTimeout,
-                    items: _timeoutOptions
-                        .map((s) => DropdownMenuItem<String?>(
-                              value: s.toString(),
-                              child: Text('$s 秒'),
-                            ))
-                        .toList(),
-                    onChanged: (v) => setState(() => _islandTimeout = v),
+                  Row(
+                    children: [
+                      SizedBox(
+                        width: 76,
+                        child: Text(
+                          '自动消失',
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                color: cs.onSurfaceVariant,
+                              ),
+                        ),
+                      ),
+                      Expanded(
+                        child: TextFormField(
+                          controller: _timeoutController,
+                          focusNode: _timeoutFocusNode,
+                          keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true,
+                          ),
+                          inputFormatters: [_TimeoutInputFormatter()],
+                          decoration: InputDecoration(
+                            hintText: '不更改',
+                            suffixText: _islandTimeout != null ? '秒' : null,
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 12,
+                            ),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            filled: true,
+                            fillColor: cs.surfaceContainerHighest,
+                          ),
+                          onChanged: (v) => setState(
+                            () => _islandTimeout = v.trim().isEmpty ? null : v.trim(),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 24),
                 ],
@@ -453,6 +511,39 @@ class _BatchSettingRow extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+// ── 自动消失秒数输入格式化器 ───────────────────────────────────────────────────
+// 规则：只允许数字和一个小数点；小数点后超过 2 位时自动截断至 2 位。
+
+class _TimeoutInputFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    var text = newValue.text;
+    if (text.isEmpty) return newValue;
+
+    // 去除非数字、非小数点字符
+    text = text.replaceAll(RegExp(r'[^\d.]'), '');
+
+    // 处理多个小数点：保留第一个，合并后续部分
+    final dotIndex = text.indexOf('.');
+    if (dotIndex != -1) {
+      final intPart = text.substring(0, dotIndex);
+      final decPart = text.substring(dotIndex + 1).replaceAll('.', '');
+      // 超过 2 位小数时只取前 2 位
+      final truncated = decPart.length > 2 ? decPart.substring(0, 2) : decPart;
+      text = '$intPart.$truncated';
+    }
+
+    if (text == newValue.text) return newValue;
+    return TextEditingValue(
+      text: text,
+      selection: TextSelection.collapsed(offset: text.length),
     );
   }
 }

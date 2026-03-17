@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../controllers/whitelist_controller.dart';
 
 /// 渠道高级设置对话框。
@@ -54,14 +55,8 @@ class _ChannelSettingsDialogState extends State<ChannelSettingsDialog> {
   late String _enableFloat;
   late String _islandTimeout;
 
-  static const _timeoutOptions = [3, 5, 10, 30, 60, 300, 1800, 3600];
-
-  String _normalizeTimeout(String v) {
-    final n = int.tryParse(v) ?? 0;
-    // 找最近的选项，默认取第一个
-    if (_timeoutOptions.contains(n)) return v;
-    return _timeoutOptions.first.toString();
-  }
+  late final TextEditingController _timeoutController;
+  final _timeoutFocusNode = FocusNode();
 
   @override
   void initState() {
@@ -72,11 +67,14 @@ class _ChannelSettingsDialogState extends State<ChannelSettingsDialog> {
     _focusNotif    = widget.focusNotif;
     _firstFloat    = widget.firstFloat;
     _enableFloat   = widget.enableFloat;
-    _islandTimeout = _normalizeTimeout(widget.islandTimeout);
+    _islandTimeout = widget.islandTimeout;
+    _timeoutController = TextEditingController(text: _islandTimeout);
   }
 
   @override
   void dispose() {
+    _timeoutController.dispose();
+    _timeoutFocusNode.dispose();
     super.dispose();
   }
 
@@ -85,11 +83,9 @@ class _ChannelSettingsDialogState extends State<ChannelSettingsDialog> {
     final cs   = Theme.of(context).colorScheme;
     final text = Theme.of(context).textTheme;
 
-    final keyboardHeight = MediaQuery.of(context).viewInsets.bottom;
-
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      insetPadding: EdgeInsets.fromLTRB(28, 40, 28, 40 + keyboardHeight),
+      insetPadding: const EdgeInsets.fromLTRB(28, 40, 28, 40),
       child: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
         child: Column(
@@ -225,18 +221,28 @@ class _ChannelSettingsDialogState extends State<ChannelSettingsDialog> {
             // 自动消失时间
             _SettingRow(
               label: '自动消失',
-              child: _DropdownField<String>(
-                value: _islandTimeout,
-                items: _timeoutOptions
-                    .map((s) => DropdownMenuItem(
-                          value: s.toString(),
-                          child: Text('$s 秒'),
-                        ))
-                    .toList(),
+              child: TextFormField(
+                controller: _timeoutController,
+                focusNode: _timeoutFocusNode,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                inputFormatters: [_TimeoutInputFormatter()],
+                decoration: InputDecoration(
+                  suffixText: _islandTimeout.isNotEmpty ? '秒' : null,
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 12,
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  filled: true,
+                  fillColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+                ),
                 onChanged: (v) {
-                  if (v == null) return;
-                  setState(() => _islandTimeout = v);
-                  widget.onIslandTimeoutChanged(v);
+                  final trimmed = v.trim();
+                  if (trimmed.isEmpty) return;
+                  setState(() => _islandTimeout = trimmed);
+                  widget.onIslandTimeoutChanged(trimmed);
                 },
               ),
             ),
@@ -316,6 +322,39 @@ class _DropdownField<T> extends StatelessWidget {
         filled: true,
         fillColor: cs.surfaceContainerHighest,
       ),
+    );
+  }
+}
+
+// ── 自动消失秒数输入格式化器 ───────────────────────────────────────────────────
+// 规则：只允许数字和一个小数点；小数点后超过 2 位时自动截断至 2 位。
+
+class _TimeoutInputFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    var text = newValue.text;
+    if (text.isEmpty) return newValue;
+
+    // 去除非数字、非小数点字符
+    text = text.replaceAll(RegExp(r'[^\d.]'), '');
+
+    // 处理多个小数点：保留第一个，合并后续部分
+    final dotIndex = text.indexOf('.');
+    if (dotIndex != -1) {
+      final intPart = text.substring(0, dotIndex);
+      final decPart = text.substring(dotIndex + 1).replaceAll('.', '');
+      // 超过 2 位小数时只取前 2 位
+      final truncated = decPart.length > 2 ? decPart.substring(0, 2) : decPart;
+      text = '$intPart.$truncated';
+    }
+
+    if (text == newValue.text) return newValue;
+    return TextEditingValue(
+      text: text,
+      selection: TextSelection.collapsed(offset: text.length),
     );
   }
 }

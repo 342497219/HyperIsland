@@ -68,6 +68,16 @@ class _WhitelistPageState extends State<WhitelistPage> {
 
   void _deselectAll() => setState(() => _selectedPackages.clear());
 
+  void _selectEnabled() {
+    setState(() {
+      _selectedPackages.addAll(
+        _ctrl.filteredApps
+            .where((a) => _ctrl.enabledPackages.contains(a.packageName))
+            .map((a) => a.packageName),
+      );
+    });
+  }
+
   void _clearSelection() => setState(() {
         _selectedPackages.clear();
         _inSelectionMode = false;
@@ -178,20 +188,33 @@ class _WhitelistPageState extends State<WhitelistPage> {
                       tooltip: allSelected ? '全不选' : '全选',
                       onPressed: allSelected ? _deselectAll : _selectAll,
                     ),
+                    // 批量设置渠道配置
+                    IconButton(
+                      icon: const Icon(Icons.tune),
+                      tooltip: '批量设置渠道配置',
+                      onPressed: _selectedPackages.isNotEmpty
+                          ? _batchApplySelected
+                          : null,
+                    ),
                     // 批量操作菜单
                     PopupMenuButton<String>(
                       icon: const Icon(Icons.more_vert),
                       onSelected: (value) async {
                         switch (value) {
+                          case 'select_enabled':
+                            _selectEnabled();
                           case 'enable':
                             await _enableSelected();
                           case 'disable':
                             await _disableSelected();
-                          case 'batch_settings':
-                            await _batchApplySelected();
                         }
                       },
                       itemBuilder: (_) => [
+                        PopupMenuItem(
+                          value: 'select_enabled',
+                          child: const Text('选择已开启应用'),
+                        ),
+                        const PopupMenuDivider(),
                         PopupMenuItem(
                           value: 'enable',
                           enabled: _selectedPackages.isNotEmpty,
@@ -201,12 +224,6 @@ class _WhitelistPageState extends State<WhitelistPage> {
                           value: 'disable',
                           enabled: _selectedPackages.isNotEmpty,
                           child: const Text('批量关闭'),
-                        ),
-                        const PopupMenuDivider(),
-                        PopupMenuItem(
-                          value: 'batch_settings',
-                          enabled: _selectedPackages.isNotEmpty,
-                          child: const Text('批量设置渠道配置'),
                         ),
                       ],
                     ),
