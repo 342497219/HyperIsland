@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../controllers/whitelist_controller.dart';
+import '../widgets/batch_channel_settings_sheet.dart';
 import '../widgets/channel_settings_dialog.dart';
 
 class AppChannelsPage extends StatefulWidget {
@@ -167,6 +168,59 @@ class _AppChannelsPageState extends State<AppChannelsPage> {
     await widget.controller.setChannelTimeout(widget.app.packageName, channelId, value);
   }
 
+  // ── 批量操作 ────────────────────────────────────────────────────────────────
+
+  /// 仅重新加载 prefs 侧的渠道配置，不重新调用原生接口。
+  Future<void> _reloadSettings() async {
+    final pkg = widget.app.packageName;
+    final channelIds = (_channels ?? []).map((c) => c.id).toList();
+    if (channelIds.isEmpty) return;
+    final results = await Future.wait([
+      widget.controller.getChannelTemplates(pkg, channelIds),
+      widget.controller.getChannelExtraSettings(pkg, channelIds),
+    ]);
+    if (mounted) {
+      setState(() {
+        _channelTemplates = results[0] as Map<String, String>;
+        _channelExtras    = results[1] as Map<String, Map<String, String>>;
+      });
+    }
+  }
+
+  /// 批量设置渠道配置（仅对已启用渠道生效）。
+  Future<void> _batchApply() async {
+    final channels = _channels ?? [];
+    if (channels.isEmpty) return;
+
+    // 仅对已启用渠道操作；空集合表示全部渠道生效
+    final enabledIds = _enabledChannels.isEmpty
+        ? channels.map((c) => c.id).toList()
+        : _enabledChannels.toList();
+
+    final result = await BatchChannelSettingsSheet.show(
+      context,
+      scope: GlobalScope(
+        subtitle: '将应用到已启用的 ${enabledIds.length} 个渠道',
+      ),
+      templateLabels: _templateLabels,
+    );
+    if (result == null || !mounted) return;
+
+    await widget.controller.batchApplyChannelSettings(
+      widget.app.packageName,
+      enabledIds,
+      result.settings,
+    );
+
+    if (mounted) await _reloadSettings();
+  }
+
+  /// 清除渠道过滤，使全部渠道生效。
+  Future<void> _enableAllChannels() async {
+    setState(() => _enabledChannels = {});
+    await widget.controller.setEnabledChannels(widget.app.packageName, {});
+  }
+
   String _importanceLabel(int importance) => switch (importance) {
         0 => '无',
         1 => '极低',
@@ -210,6 +264,29 @@ class _AppChannelsPageState extends State<AppChannelsPage> {
                 ),
               ],
             ),
+            actions: [
+              if (!_loading && channels.isNotEmpty)
+                PopupMenuButton<String>(
+                  icon: const Icon(Icons.more_vert),
+                  onSelected: (value) {
+                    switch (value) {
+                      case 'batch':      _batchApply();
+                      case 'enable_all': _enableAllChannels();
+                    }
+                  },
+                  itemBuilder: (_) => const [
+                    PopupMenuItem(
+                      value: 'batch',
+                      child: Text('批量设置渠道配置'),
+                    ),
+                    PopupMenuDivider(),
+                    PopupMenuItem(
+                      value: 'enable_all',
+                      child: Text('启用全部渠道'),
+                    ),
+                  ],
+                ),
+            ],
           ),
 
           // 应用总开关关闭时的提示横幅

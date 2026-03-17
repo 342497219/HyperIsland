@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../controllers/whitelist_controller.dart';
+import '../widgets/batch_channel_settings_sheet.dart';
 import 'app_channels_page.dart';
 
 class WhitelistPage extends StatefulWidget {
@@ -13,6 +14,8 @@ class _WhitelistPageState extends State<WhitelistPage> {
   late final WhitelistController _ctrl;
   final _searchCtrl = TextEditingController();
   final _searchFocus = FocusNode();
+  final Set<String> _selectedPackages = {};
+  bool _inSelectionMode = false;
 
   @override
   void initState() {
@@ -37,13 +40,114 @@ class _WhitelistPageState extends State<WhitelistPage> {
     super.dispose();
   }
 
+  bool get _selectionMode => _inSelectionMode;
+
+  void _enterSelectionMode([String? pkg]) {
+    setState(() {
+      _inSelectionMode = true;
+      if (pkg != null) _selectedPackages.add(pkg);
+    });
+  }
+
+  void _toggleSelection(String pkg) {
+    setState(() {
+      if (_selectedPackages.contains(pkg)) {
+        _selectedPackages.remove(pkg);
+      } else {
+        _selectedPackages.add(pkg);
+      }
+    });
+  }
+
+  void _selectAll() {
+    setState(() {
+      _selectedPackages.addAll(
+          _ctrl.filteredApps.map((a) => a.packageName));
+    });
+  }
+
+  void _deselectAll() => setState(() => _selectedPackages.clear());
+
+  void _clearSelection() => setState(() {
+        _selectedPackages.clear();
+        _inSelectionMode = false;
+      });
+
+  Future<void> _enableSelected() async {
+    if (_selectedPackages.isEmpty) return;
+    await _ctrl.setEnabledBatch(_selectedPackages.toList(), true);
+  }
+
+  Future<void> _disableSelected() async {
+    if (_selectedPackages.isEmpty) return;
+    await _ctrl.setEnabledBatch(_selectedPackages.toList(), false);
+  }
+
+  /// 对已选应用的已启用渠道批量应用配置。
+  Future<void> _batchApplySelected() async {
+    if (_selectedPackages.isEmpty) return;
+    final templateLabels = await _ctrl.getTemplates();
+    if (!mounted) return;
+
+    final selected = _selectedPackages.toList();
+    final result = await BatchChannelSettingsSheet.show(
+      context,
+      scope: GlobalScope(
+        subtitle: '将应用到已选 ${selected.length} 个应用的已启用渠道',
+      ),
+      templateLabels: templateLabels,
+    );
+    if (result == null || !mounted) return;
+
+    final doneNotifier = ValueNotifier(0);
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => _GlobalBatchProgressDialog(
+        total: selected.length,
+        doneNotifier: doneNotifier,
+      ),
+    );
+
+    for (var i = 0; i < selected.length; i++) {
+      final pkg = selected[i];
+      try {
+        final channels = await _ctrl.getChannels(pkg);
+        final enabledChannels = await _ctrl.getEnabledChannels(pkg);
+        final ids = enabledChannels.isEmpty
+            ? channels.map((c) => c.id).toList()
+            : enabledChannels.toList();
+        if (ids.isNotEmpty) {
+          await _ctrl.batchApplyChannelSettings(pkg, ids, result.settings);
+        }
+      } catch (_) {}
+      doneNotifier.value = i + 1;
+    }
+
+    doneNotifier.dispose();
+    if (mounted) Navigator.pop(context);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('已批量应用到 ${selected.length} 个应用')),
+      );
+      _clearSelection();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final apps = _ctrl.filteredApps;
     final enabledCount = _ctrl.enabledPackages.length;
+    final allSelected = apps.isNotEmpty &&
+        apps.every((a) => _selectedPackages.contains(a.packageName));
 
-    return Scaffold(
+    return PopScope(
+      canPop: !_selectionMode,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop && _selectionMode) _clearSelection();
+      },
+      child: Scaffold(
       backgroundColor: cs.surface,
       body: RefreshIndicator(
         onRefresh: _ctrl.refresh,
@@ -51,47 +155,106 @@ class _WhitelistPageState extends State<WhitelistPage> {
         physics: const AlwaysScrollableScrollPhysics(),
         slivers: [
           SliverAppBar.large(
-            title: const Text('应用适配'),
             backgroundColor: cs.surface,
             centerTitle: false,
-            actions: [
-              PopupMenuButton<String>(
-                icon: const Icon(Icons.more_vert),
-                onSelected: (value) async {
-                  switch (value) {
-                    case 'toggle_system':
-                      _ctrl.setShowSystemApps(!_ctrl.showSystemApps);
-                    case 'refresh':
-                      await _ctrl.refresh();
-                    case 'enable_all':
-                      await _ctrl.enableAll();
-                    case 'disable_all':
-                      await _ctrl.disableAll();
-                  }
-                },
-                itemBuilder: (_) => [
-                  CheckedPopupMenuItem<String>(
-                    value: 'toggle_system',
-                    checked: _ctrl.showSystemApps,
-                    child: const Text('显示系统应用'),
-                  ),
-                  const PopupMenuDivider(),
-                  const PopupMenuItem<String>(
-                    value: 'refresh',
-                    child: Text('刷新列表'),
-                  ),
-                  const PopupMenuDivider(),
-                  const PopupMenuItem<String>(
-                    value: 'enable_all',
-                    child: Text('一键开启全部'),
-                  ),
-                  const PopupMenuItem<String>(
-                    value: 'disable_all',
-                    child: Text('一键关闭全部'),
-                  ),
-                ],
-              ),
-            ],
+            automaticallyImplyLeading: !_selectionMode,
+            leading: _selectionMode
+                ? IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: _clearSelection,
+                    tooltip: '取消选择',
+                  )
+                : null,
+            title: _selectionMode
+                ? Text('已选 ${_selectedPackages.length} 个应用')
+                : const Text('应用适配'),
+            actions: _selectionMode
+                ? [
+                    // 全选 / 全不选
+                    IconButton(
+                      icon: Icon(allSelected
+                          ? Icons.deselect
+                          : Icons.select_all),
+                      tooltip: allSelected ? '全不选' : '全选',
+                      onPressed: allSelected ? _deselectAll : _selectAll,
+                    ),
+                    // 批量操作菜单
+                    PopupMenuButton<String>(
+                      icon: const Icon(Icons.more_vert),
+                      onSelected: (value) async {
+                        switch (value) {
+                          case 'enable':
+                            await _enableSelected();
+                          case 'disable':
+                            await _disableSelected();
+                          case 'batch_settings':
+                            await _batchApplySelected();
+                        }
+                      },
+                      itemBuilder: (_) => [
+                        PopupMenuItem(
+                          value: 'enable',
+                          enabled: _selectedPackages.isNotEmpty,
+                          child: const Text('批量开启'),
+                        ),
+                        PopupMenuItem(
+                          value: 'disable',
+                          enabled: _selectedPackages.isNotEmpty,
+                          child: const Text('批量关闭'),
+                        ),
+                        const PopupMenuDivider(),
+                        PopupMenuItem(
+                          value: 'batch_settings',
+                          enabled: _selectedPackages.isNotEmpty,
+                          child: const Text('批量设置渠道配置'),
+                        ),
+                      ],
+                    ),
+                  ]
+                : [
+                    // 进入多选模式
+                    IconButton(
+                      icon: const Icon(Icons.checklist_outlined),
+                      tooltip: '多选',
+                      onPressed: _ctrl.loading ? null : _enterSelectionMode,
+                    ),
+                    PopupMenuButton<String>(
+                      icon: const Icon(Icons.more_vert),
+                      onSelected: (value) async {
+                        switch (value) {
+                          case 'toggle_system':
+                            _ctrl.setShowSystemApps(!_ctrl.showSystemApps);
+                          case 'refresh':
+                            await _ctrl.refresh();
+                          case 'enable_all':
+                            await _ctrl.enableAll();
+                          case 'disable_all':
+                            await _ctrl.disableAll();
+                        }
+                      },
+                      itemBuilder: (_) => [
+                        CheckedPopupMenuItem<String>(
+                          value: 'toggle_system',
+                          checked: _ctrl.showSystemApps,
+                          child: const Text('显示系统应用'),
+                        ),
+                        const PopupMenuDivider(),
+                        const PopupMenuItem<String>(
+                          value: 'refresh',
+                          child: Text('刷新列表'),
+                        ),
+                        const PopupMenuDivider(),
+                        const PopupMenuItem<String>(
+                          value: 'enable_all',
+                          child: Text('一键开启全部'),
+                        ),
+                        const PopupMenuItem<String>(
+                          value: 'disable_all',
+                          child: Text('一键关闭全部'),
+                        ),
+                      ],
+                    ),
+                  ],
           ),
 
           // 说明 + 搜索栏
@@ -155,31 +318,44 @@ class _WhitelistPageState extends State<WhitelistPage> {
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
               sliver: SliverList(
                 delegate: SliverChildBuilderDelegate(
-                  (context, index) => _AppTile(
-                    app: apps[index],
-                    enabled:
-                        _ctrl.enabledPackages.contains(apps[index].packageName),
-                    onChanged: (v) => _ctrl.setEnabled(apps[index].packageName, v),
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => AppChannelsPage(
-                          app: apps[index],
-                          controller: _ctrl,
-                          appEnabled: _ctrl.enabledPackages
-                              .contains(apps[index].packageName),
-                        ),
-                      ),
-                    ),
-                    isFirst: index == 0,
-                    isLast: index == apps.length - 1,
-                  ),
+                  (context, index) {
+                    final app = apps[index];
+                    final pkg = app.packageName;
+                    return _AppTile(
+                      app: app,
+                      enabled: _ctrl.enabledPackages.contains(pkg),
+                      onChanged: _selectionMode
+                          ? null
+                          : (v) => _ctrl.setEnabled(pkg, v),
+                      onTap: _selectionMode
+                          ? () => _toggleSelection(pkg)
+                          : () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => AppChannelsPage(
+                                    app: app,
+                                    controller: _ctrl,
+                                    appEnabled:
+                                        _ctrl.enabledPackages.contains(pkg),
+                                  ),
+                                ),
+                              ),
+                      onLongPress: _selectionMode
+                          ? null
+                          : () => _enterSelectionMode(pkg),
+                      isSelected: _selectedPackages.contains(pkg),
+                      selectionMode: _selectionMode,
+                      isFirst: index == 0,
+                      isLast: index == apps.length - 1,
+                    );
+                  },
                   childCount: apps.length,
                 ),
               ),
             ),
 
         ],
+      ),
       ),
       ),
     );
@@ -194,6 +370,9 @@ class _AppTile extends StatelessWidget {
     required this.onTap,
     required this.isFirst,
     required this.isLast,
+    this.selectionMode = false,
+    this.isSelected = false,
+    this.onLongPress,
   });
 
   final AppInfo app;
@@ -202,6 +381,9 @@ class _AppTile extends StatelessWidget {
   final VoidCallback onTap;
   final bool isFirst;
   final bool isLast;
+  final bool selectionMode;
+  final bool isSelected;
+  final VoidCallback? onLongPress;
 
   @override
   Widget build(BuildContext context) {
@@ -216,11 +398,14 @@ class _AppTile extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         Material(
-          color: cs.surfaceContainerHighest,
+          color: isSelected
+              ? cs.primaryContainer
+              : cs.surfaceContainerHighest,
           borderRadius: radius,
           child: InkWell(
             borderRadius: radius,
             onTap: onTap,
+            onLongPress: onLongPress,
             child: Padding(
               padding:
                   const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -260,7 +445,13 @@ class _AppTile extends StatelessWidget {
                       ],
                     ),
                   ),
-                  Switch(value: enabled, onChanged: onChanged),
+                  if (selectionMode)
+                    Checkbox(
+                      value: isSelected,
+                      onChanged: (_) => onTap(),
+                    )
+                  else
+                    Switch(value: enabled, onChanged: onChanged),
                 ],
               ),
             ),
@@ -274,6 +465,55 @@ class _AppTile extends StatelessWidget {
             color: cs.outlineVariant.withValues(alpha: 0.4),
           ),
       ],
+    );
+  }
+}
+
+// ── 全局批量进度对话框 ────────────────────────────────────────────────────────
+
+class _GlobalBatchProgressDialog extends StatelessWidget {
+  const _GlobalBatchProgressDialog({
+    required this.total,
+    required this.doneNotifier,
+  });
+
+  final int total;
+  final ValueNotifier<int> doneNotifier;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs   = Theme.of(context).colorScheme;
+    final text = Theme.of(context).textTheme;
+
+    return PopScope(
+      canPop: false,
+      child: AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        content: ValueListenableBuilder<int>(
+          valueListenable: doneNotifier,
+          builder: (_, done, __) {
+            final progress = total > 0 ? done / total : 0.0;
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('正在应用配置…', style: text.titleMedium),
+                const SizedBox(height: 16),
+                LinearProgressIndicator(
+                  value: progress,
+                  borderRadius: BorderRadius.circular(4),
+                  backgroundColor: cs.surfaceContainerHighest,
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  '$done / $total 个应用',
+                  style: text.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                ),
+              ],
+            );
+          },
+        ),
+      ),
     );
   }
 }
