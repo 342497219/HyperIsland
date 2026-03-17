@@ -137,7 +137,7 @@ jobs:
           name: HyperIsland-v${{ steps.version.outputs.version_name }}
           path: build/app/outputs/flutter-apk/app-release.apk
           retention-days: 30
-          compression-level: 0
+          compression: none
 
       # 第十一步：重命名 APK 文件（仅在版本变更时执行）
       # 将编译输出的 app-release.apk 重命名为 HyperIsland-v1.5.0.apk
