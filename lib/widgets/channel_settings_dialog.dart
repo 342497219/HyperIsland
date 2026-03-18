@@ -224,8 +224,8 @@ class _ChannelSettingsDialogState extends State<ChannelSettingsDialog> {
               child: TextFormField(
                 controller: _timeoutController,
                 focusNode: _timeoutFocusNode,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                inputFormatters: [_TimeoutInputFormatter()],
+                keyboardType: TextInputType.number,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                 decoration: InputDecoration(
                   suffixText: _islandTimeout.isNotEmpty ? '秒' : null,
                   contentPadding: const EdgeInsets.symmetric(
@@ -240,7 +240,8 @@ class _ChannelSettingsDialogState extends State<ChannelSettingsDialog> {
                 ),
                 onChanged: (v) {
                   final trimmed = v.trim();
-                  if (trimmed.isEmpty) return;
+                  final n = int.tryParse(trimmed);
+                  if (trimmed.isEmpty || n == null || n < 1) return;
                   setState(() => _islandTimeout = trimmed);
                   widget.onIslandTimeoutChanged(trimmed);
                 },
@@ -326,35 +327,3 @@ class _DropdownField<T> extends StatelessWidget {
   }
 }
 
-// ── 自动消失秒数输入格式化器 ───────────────────────────────────────────────────
-// 规则：只允许数字和一个小数点；小数点后超过 2 位时自动截断至 2 位。
-
-class _TimeoutInputFormatter extends TextInputFormatter {
-  @override
-  TextEditingValue formatEditUpdate(
-    TextEditingValue oldValue,
-    TextEditingValue newValue,
-  ) {
-    var text = newValue.text;
-    if (text.isEmpty) return newValue;
-
-    // 去除非数字、非小数点字符
-    text = text.replaceAll(RegExp(r'[^\d.]'), '');
-
-    // 处理多个小数点：保留第一个，合并后续部分
-    final dotIndex = text.indexOf('.');
-    if (dotIndex != -1) {
-      final intPart = text.substring(0, dotIndex);
-      final decPart = text.substring(dotIndex + 1).replaceAll('.', '');
-      // 超过 2 位小数时只取前 2 位
-      final truncated = decPart.length > 2 ? decPart.substring(0, 2) : decPart;
-      text = '$intPart.$truncated';
-    }
-
-    if (text == newValue.text) return newValue;
-    return TextEditingValue(
-      text: text,
-      selection: TextSelection.collapsed(offset: text.length),
-    );
-  }
-}
