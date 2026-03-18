@@ -11,7 +11,7 @@ import de.robv.android.xposed.XposedHelpers
 import de.robv.android.xposed.callbacks.XC_LoadPackage
 
 /**
- * 通用进度条通知 Hook — 在 SystemUI 进程内 Hook MiuiBaseNotifUtil.generateInnerNotifBean()。
+ * 通用通知 Hook — 在 SystemUI 进程内 Hook MiuiBaseNotifUtil.generateInnerNotifBean()。
  *
  * 调用链：
  *   onNotificationPosted(sbn)
@@ -131,7 +131,7 @@ class GenericProgressHook : IXposedHookLoadPackage {
                         else channelCsv.split(",").filter { it.isNotBlank() }.toSet()
                         pkg to channels
                     }
-                cachedWhitelist = map
+                if (map.isNotEmpty()) cachedWhitelist = map
                 XposedBridge.log("HyperIsland[Generic]: whitelist loaded (${map.size} apps): ${map.keys}")
                 map
             } catch (e: Exception) {
@@ -178,6 +178,9 @@ class GenericProgressHook : IXposedHookLoadPackage {
             if (allowedChannels.isNotEmpty() && channelId !in allowedChannels) return
 
             val extras = notif.extras ?: return
+
+            // 跳过已自带超级岛参数的通知，避免重复处理导致 SystemUI 崩溃
+            if (extras.containsKey("miui.focus.param")) return
 
             // ── 进度条检测（需先于 flag 检查，以便状态变化通知绕过缓存标记）────────
             val progressMax    = extras.getInt(Notification.EXTRA_PROGRESS_MAX, 0)
