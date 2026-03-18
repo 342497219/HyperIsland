@@ -91,6 +91,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String get enableInLSPosed => 'Please enable this module in LSPosed';
 
   @override
+  String get systemNotSupported => 'System Not Supported';
+
+  @override
+  String systemNotSupportedSubtitle(int version) {
+    return 'Current system does not support Dynamic Island (protocol version $version, requires version 3)';
+  }
+
+  @override
   String restartFailed(String message) {
     return 'Restart failed: $message';
   }

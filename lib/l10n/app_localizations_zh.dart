@@ -91,6 +91,14 @@ class AppLocalizationsZh extends AppLocalizations {
   String get enableInLSPosed => '请在 LSPosed 中启用本模块';
 
   @override
+  String get systemNotSupported => '系统不支持';
+
+  @override
+  String systemNotSupportedSubtitle(int version) {
+    return '当前系统不支持超级岛功能（协议版本 $version，需要版本 3）';
+  }
+
+  @override
   String restartFailed(String message) {
     return '重启失败：$message';
   }

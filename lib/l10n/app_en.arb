@@ -29,6 +29,13 @@
   "activated": "Activated",
   "notActivated": "Not Activated",
   "enableInLSPosed": "Please enable this module in LSPosed",
+  "systemNotSupported": "System Not Supported",
+  "systemNotSupportedSubtitle": "Current system does not support Dynamic Island (protocol version {version}, requires version 3)",
+  "@systemNotSupportedSubtitle": {
+    "placeholders": {
+      "version": { "type": "int" }
+    }
+  },
   "restartFailed": "Restart failed: {message}",
   "note1": "1. This page is only for testing Dynamic Island support, not actual effects",
   "note2": "2. Disable focus notification whitelist for System UI and MIUI Framework in HyperCeiler",

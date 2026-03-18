@@ -39,6 +39,13 @@
   "activated": "已激活",
   "notActivated": "未激活",
   "enableInLSPosed": "请在 LSPosed 中启用本模块",
+  "systemNotSupported": "系统不支持",
+  "systemNotSupportedSubtitle": "当前系统不支持超级岛功能（协议版本 {version}，需要版本 3）",
+  "@systemNotSupportedSubtitle": {
+    "placeholders": {
+      "version": { "type": "int" }
+    }
+  },
   "restartFailed": "重启失败：{message}",
   "@restartFailed": {
     "placeholders": {

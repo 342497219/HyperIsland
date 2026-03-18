@@ -254,6 +254,18 @@ abstract class AppLocalizations {
   /// **'请在 LSPosed 中启用本模块'**
   String get enableInLSPosed;
 
+  /// No description provided for @systemNotSupported.
+  ///
+  /// In zh, this message translates to:
+  /// **'系统不支持'**
+  String get systemNotSupported;
+
+  /// No description provided for @systemNotSupportedSubtitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'当前系统不支持超级岛功能（协议版本 {version}，需要版本 3）'**
+  String systemNotSupportedSubtitle(int version);
+
   /// No description provided for @restartFailed.
   ///
   /// In zh, this message translates to:

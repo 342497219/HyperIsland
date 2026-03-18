@@ -4,6 +4,7 @@ import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.os.Bundle
+import android.provider.Settings
 import android.util.Log
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -103,6 +104,15 @@ class MainActivity : FlutterActivity() {
 
                 "isModuleActive" -> {
                     result.success(isModuleActive())
+                }
+
+                "getFocusProtocolVersion" -> {
+                    val version = Settings.System.getInt(
+                        contentResolver,
+                        "notification_focus_protocol",
+                        0
+                    )
+                    result.success(version)
                 }
 
                 else -> {

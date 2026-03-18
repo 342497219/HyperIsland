@@ -6,17 +6,24 @@ class HomeController extends ChangeNotifier {
 
   bool isSending = false;
   bool? moduleActive; // null = 检测中
+  int? focusProtocolVersion; // null = 检测中
 
   HomeController() {
-    _checkModuleActive();
+    _checkStatus();
   }
 
-  Future<void> _checkModuleActive() async {
+  Future<void> _checkStatus() async {
     try {
       final bool active = await _platform.invokeMethod('isModuleActive');
       moduleActive = active;
     } catch (_) {
       moduleActive = false;
+    }
+    try {
+      final int version = await _platform.invokeMethod('getFocusProtocolVersion');
+      focusProtocolVersion = version;
+    } catch (_) {
+      focusProtocolVersion = 0;
     }
     notifyListeners();
   }

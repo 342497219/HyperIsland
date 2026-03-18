@@ -205,6 +205,11 @@ class _HomePageState extends State<HomePage> {
             sliver: SliverList(
               delegate: SliverChildListDelegate([
                 _ModuleStatusCard(active: _ctrl.moduleActive),
+                if (_ctrl.focusProtocolVersion != null &&
+                    _ctrl.focusProtocolVersion != 3) ...[
+                  const SizedBox(height: 12),
+                  _SystemNotSupportedCard(version: _ctrl.focusProtocolVersion!),
+                ],
                 const SizedBox(height: 16),
 
                 SectionLabel(l10n.notificationTest),
@@ -322,6 +327,62 @@ class _ModuleStatusCard extends StatelessWidget {
                           ),
                     ),
                   ],
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SystemNotSupportedCard extends StatelessWidget {
+  final int version;
+  const _SystemNotSupportedCard({required this.version});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final l10n = AppLocalizations.of(context)!;
+    final color = cs.error;
+
+    return Card(
+      elevation: 0,
+      color: cs.errorContainer,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Row(
+          children: [
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.15),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.warning_amber_rounded, color: color, size: 28),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    l10n.systemNotSupported,
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          color: color,
+                          fontWeight: FontWeight.bold,
+                        ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    l10n.systemNotSupportedSubtitle(version),
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: color.withValues(alpha: 0.8),
+                        ),
+                  ),
                 ],
               ),
             ),
