@@ -29,12 +29,11 @@ class BlacklistController extends ChangeNotifier {
   bool showSystemApps = false;
 
   static const _gamePresets = {
-    'com.kurogame.mingchao', // 鸣潮
-    'com.kurogame.wutheringwaves.global', // 鸣潮国际服
     'com.miHoYo.Yuanshen', // 原神
     'com.miHoYo.GenshinImpact', // 原神国际服
     'com.miHoYo.ys.bilibili', // 原神B服
-    'com.miHoYo.ys.mi', // 原神米服
+    'com.kurogame.mingchao', // 鸣潮
+    'com.kurogame.wutheringwaves.global', // 鸣潮国际服
     'com.miHoYo.hkrpg', // 星穹铁道
     'com.miHoYo.hkrpg.bilibili', // 星穹铁道B服
     'com.HoYoverse.hkrpgoversea', // 星穹铁道国际服
