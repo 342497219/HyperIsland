@@ -151,9 +151,6 @@
 
   "navBlacklist": "Focus Blacklist",
   "navBlacklistSubtitle": "Block focus notification float or hide for specific apps",
-  "blacklistStrategy": "Intercept Strategy",
-  "blacklistStrategySkip": "A. Disable auto-float (Keep island)",
-  "blacklistStrategyDisable": "B. Disable completely (Drop)",
   "presetGamesTitle": "Quick Filter Popular Games",
   "presetGamesSuccess": "Added {count} installed games to blacklist from preset",
   "@presetGamesSuccess": {

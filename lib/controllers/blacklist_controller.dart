@@ -5,7 +5,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 const _channel = MethodChannel('io.github.hyperisland/test');
 const kPrefAppBlacklist = 'pref_app_blacklist';
-const kPrefAppBlacklistStrategy = 'pref_app_blacklist_strategy';
 
 class AppInfo {
   final String packageName;
@@ -25,7 +24,6 @@ class BlacklistController extends ChangeNotifier {
   List<AppInfo> _allApps = [];
   List<AppInfo> _sortedApps = [];
   Set<String> blacklistedPackages = {};
-  String blacklistStrategy = 'skip'; // 'skip' 或 'disable'
   bool loading = true;
   String _searchQuery = '';
   bool showSystemApps = false;
@@ -40,6 +38,7 @@ class BlacklistController extends ChangeNotifier {
     'com.tencent.tmgp.cf',          // 穿越火线
     'com.tencent.jkchess',          // 金铲铲之战
     'com.tencent.tmgp.speedmobile', //QQ飞车
+    'com.netease.moba'
   };
 
   BlacklistController() {
@@ -81,8 +80,6 @@ class BlacklistController extends ChangeNotifier {
       blacklistedPackages =
           csv.isEmpty ? {} : csv.split(',').where((s) => s.isNotEmpty).toSet();
       
-      blacklistStrategy = prefs.getString(kPrefAppBlacklistStrategy) ?? 'skip';
-
       final rawList =
           await _channel.invokeMethod<List<dynamic>>(
               'getInstalledApps', {'includeSystem': true}) ?? [];
@@ -109,13 +106,6 @@ class BlacklistController extends ChangeNotifier {
     }
 
     loading = false;
-    notifyListeners();
-  }
-
-  Future<void> setStrategy(String strategy) async {
-    blacklistStrategy = strategy;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(kPrefAppBlacklistStrategy, strategy);
     notifyListeners();
   }
 
@@ -173,16 +163,4 @@ class BlacklistController extends ChangeNotifier {
     return addedCount;
   }
 
-  Future<void> setBlacklistedBatch(List<String> packages, bool enabled) async {
-    for (final pkg in packages) {
-      if (enabled) {
-        blacklistedPackages.add(pkg);
-      } else {
-        blacklistedPackages.remove(pkg);
-      }
-    }
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(kPrefAppBlacklist, blacklistedPackages.join(','));
-    notifyListeners();
-  }
 }

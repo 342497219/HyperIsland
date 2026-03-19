@@ -911,32 +911,14 @@ abstract class AppLocalizations {
   /// No description provided for @navBlacklist.
   ///
   /// In zh, this message translates to:
-  /// **'焦点黑名单'**
+  /// **'通知黑名单'**
   String get navBlacklist;
 
   /// No description provided for @navBlacklistSubtitle.
   ///
   /// In zh, this message translates to:
-  /// **'屏蔽指定应用的焦点通知展开或强制隐藏'**
+  /// **'启动黑名单应用时，停用焦点通知的自动展开功能'**
   String get navBlacklistSubtitle;
-
-  /// No description provided for @blacklistStrategy.
-  ///
-  /// In zh, this message translates to:
-  /// **'拦截策略'**
-  String get blacklistStrategy;
-
-  /// No description provided for @blacklistStrategySkip.
-  ///
-  /// In zh, this message translates to:
-  /// **'A. 不自动展开 (保留岛提醒)'**
-  String get blacklistStrategySkip;
-
-  /// No description provided for @blacklistStrategyDisable.
-  ///
-  /// In zh, this message translates to:
-  /// **'B. 直接禁用 (完全抛弃)'**
-  String get blacklistStrategyDisable;
 
   /// No description provided for @presetGamesTitle.
   ///

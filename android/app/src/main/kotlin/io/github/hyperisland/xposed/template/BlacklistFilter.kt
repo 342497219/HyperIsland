@@ -6,10 +6,9 @@ import de.robv.android.xposed.XposedBridge
 
 /**
  * 应用黑名单过滤器。
- * 在通知进入模板前检查前台应用是否在黑名单中，并根据策略决定：
- *  - "disable" → 返回 null，调用方应放弃本次超级岛展示
- *  - "skip"    → 返回禁用浮动的 [NotifData] 副本（岛正常展示，不自动展开）
- *  - 未命中    → 返回原始 [NotifData]
+ * 在通知进入模板前检查前台应用是否在黑名单中：
+ *  - 命中 → 返回禁用浮动的 [NotifData] 副本（岛正常展示，不自动展开）
+ *  - 未命中 → 返回原始 [NotifData]
  */
 object BlacklistFilter {
 
@@ -23,12 +22,6 @@ object BlacklistFilter {
 
         if (blacklistStr.isEmpty()) return data
 
-        var strategy = try {
-            val uri = android.net.Uri.parse("content://io.github.hyperisland.settings/pref_app_blacklist_strategy")
-            cr.query(uri, null, null, null, null)?.use { if (it.moveToFirst()) it.getString(0) else "skip" } ?: "skip"
-        } catch (_: Exception) { "skip" }
-        if (strategy.isEmpty()) strategy = "skip"
-
         val foregroundApp = try {
             val am = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
             @Suppress("DEPRECATION")
@@ -39,19 +32,11 @@ object BlacklistFilter {
         }
 
         val isBlacklisted = foregroundApp.isNotEmpty() && blacklistStr.split(",").contains(foregroundApp)
-        XposedBridge.log("HyperIsland[Blacklist]: foreground=$foregroundApp, strategy=$strategy, isBlacklisted=$isBlacklisted")
+        XposedBridge.log("HyperIsland[Blacklist]: foreground=$foregroundApp, isBlacklisted=$isBlacklisted")
 
         if (!isBlacklisted) return data
 
-        return when (strategy) {
-            "disable" -> {
-                XposedBridge.log("HyperIsland[Blacklist]: $foregroundApp disabled island")
-                null
-            }
-            else -> { // "skip"
-                XposedBridge.log("HyperIsland[Blacklist]: $foregroundApp skipped float")
-                data.copy(firstFloat = "off", enableFloatMode = "off")
-            }
-        }
+        XposedBridge.log("HyperIsland[Blacklist]: $foregroundApp skipped float")
+        return data.copy(firstFloat = "off", enableFloatMode = "off")
     }
 }

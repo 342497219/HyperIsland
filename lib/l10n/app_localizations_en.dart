@@ -477,15 +477,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'Block focus notification float or hide for specific apps';
 
   @override
-  String get blacklistStrategy => 'Intercept Strategy';
-
-  @override
-  String get blacklistStrategySkip => 'A. Disable auto-float (Keep island)';
-
-  @override
-  String get blacklistStrategyDisable => 'B. Disable completely (Drop)';
-
-  @override
   String get presetGamesTitle => 'Quick Filter Popular Games';
 
   @override
