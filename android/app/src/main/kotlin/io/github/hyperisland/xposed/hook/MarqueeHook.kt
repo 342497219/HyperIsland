@@ -19,9 +19,10 @@ import java.util.WeakHashMap
  *   2. 递归遍历视图树，对每个 TextView 添加布局变化和文本变化监听。
  *   3. 当文本宽度超出可视区域时，启动 [MarqueeController] 驱动 Choreographer 帧回调实现滚动。
  *
- * 开关热加载：
- *   通过 ContentObserver 监听 SettingsProvider 变化，实时刷新 [cachedEnabled] 缓存。
- *   关闭开关时立即停止所有正在运行的跑马灯；开启时新建视图会自动获得跑马灯效果。
+ * 渠道级控制：
+ *   由 GenericProgressHook 在处理通知时读取每个渠道的跑马灯开关设置，并通过
+ *   [pendingMarqueeEnabled] 传递给 MarqueeHook。通过 ContentObserver 监听设置变化，
+ *   变更时立即停止所有正在运行的跑马灯，待下次通知到来时重新评估。
  */
 class MarqueeHook : IXposedHookLoadPackage {
 
@@ -37,8 +38,11 @@ class MarqueeHook : IXposedHookLoadPackage {
 
         // ─── 热加载相关 ───────────────────────────────────────────────────────
 
-        /** 缓存的开关状态，null 表示尚未读取或已失效，下次访问时重新从 SettingsProvider 加载。 */
-        @Volatile private var cachedEnabled: Boolean? = null
+        /**
+         * 由 GenericProgressHook 在处理通知时设置，表示当前通知的渠道是否启用了跑马灯。
+         * MarqueeHook 在大岛视图创建时读取此值以决定是否启动跑马灯。
+         */
+        @Volatile var pendingMarqueeEnabled: Boolean = false
 
         /** 缓存的滚动速度（px/s），null 表示需重新读取。 */
         @Volatile private var cachedSpeed: Int? = null
@@ -48,7 +52,7 @@ class MarqueeHook : IXposedHookLoadPackage {
 
         /**
          * 在 SystemUI 进程内注册 ContentObserver，监听 SettingsProvider 的任意变化。
-         * 变化时清除 [cachedEnabled] 缓存，并在开关被关闭时立即停止所有跑马灯。
+         * 变化时清除缓存，并停止所有正在运行的跑马灯（下次通知到来时会重新评估）。
          * 与 GenericProgressHook.ensureObserver 保持相同模式。
          */
         fun ensureObserver(context: android.content.Context) {
@@ -58,34 +62,16 @@ class MarqueeHook : IXposedHookLoadPackage {
                 settingsUri, true,
                 object : android.database.ContentObserver(android.os.Handler(android.os.Looper.getMainLooper())) {
                     override fun onChange(selfChange: Boolean) {
-                        // 失效所有缓存，下次读取时重新查询
-                        cachedEnabled = null
+                        // 失效速度缓存，下次读取时重新查询
                         cachedSpeed = null
-                        // 若开关被关闭，立即停止所有运行中的跑马灯
-                        if (!isMarqueeEnabled(context)) {
-                            stopAllMarquees()
-                        }
+                        // 设置变更后停止所有跑马灯，待下次通知时重新评估渠道级设置
+                        stopAllMarquees()
                         XposedBridge.log("HyperIsland[MarqueeHook]: settings changed, cache cleared")
                     }
                 }
             )
             observerRegistered = true
             XposedBridge.log("HyperIsland[MarqueeHook]: ContentObserver registered in SystemUI")
-        }
-
-        /**
-         * 从缓存或 SettingsProvider 读取跑马灯开关状态。
-         * 缓存有效期内（cachedEnabled != null）不再跨进程查询。
-         */
-        private fun isMarqueeEnabled(context: android.content.Context): Boolean {
-            cachedEnabled?.let { return it }
-            val result = try {
-                val uri = android.net.Uri.parse("content://io.github.hyperisland.settings/pref_marquee_feature")
-                context.contentResolver.query(uri, null, null, null, null)
-                    ?.use { if (it.moveToFirst()) it.getInt(0) != 0 else false } ?: false
-            } catch (_: Exception) { false }
-            cachedEnabled = result
-            return result
         }
 
         /**
@@ -280,9 +266,9 @@ class MarqueeHook : IXposedHookLoadPackage {
                     override fun afterHookedMethod(param: MethodHookParam) {
                         val bigIslandView = param.result as? ViewGroup ?: return
                         val context = bigIslandView.context
-                        // 注册 ContentObserver（只执行一次），保证开关热加载生效
+                        // 注册 ContentObserver（只执行一次），保证设置热加载生效
                         ensureObserver(context)
-                        if (isMarqueeEnabled(context)) {
+                        if (pendingMarqueeEnabled) {
                             traverseAndApplyMarquee(bigIslandView)
                         }
                     }

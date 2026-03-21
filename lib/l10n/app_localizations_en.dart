@@ -176,6 +176,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get marqueeFeatureSubtitle => 'Auto scroll long text notification';
 
   @override
+  String get marqueeChannelTitle => 'Scrolling Island';
+
+  @override
   String get marqueeSpeedTitle => 'Scroll Speed';
 
   @override

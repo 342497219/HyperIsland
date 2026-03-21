@@ -21,6 +21,7 @@ class SingleChannelMode extends ChannelSettingsMode {
     required this.firstFloat,
     required this.enableFloat,
     required this.islandTimeout,
+    required this.marquee,
   });
 
   final String channelName;
@@ -31,6 +32,7 @@ class SingleChannelMode extends ChannelSettingsMode {
   final String firstFloat;
   final String enableFloat;
   final String islandTimeout;
+  final String marquee;
 }
 
 /// 批量模式：对多个渠道批量操作，字段默认"不更改"。
@@ -128,6 +130,7 @@ class _BatchChannelSettingsSheetState
   String? _firstFloat;
   String? _enableFloat;
   String? _islandTimeout;
+  String? _marquee;
 
   // 仅 BatchChannelMode + SingleAppScope 下使用
   bool _onlyEnabled = false;
@@ -149,6 +152,7 @@ class _BatchChannelSettingsSheetState
       _firstFloat    = m.firstFloat;
       _enableFloat   = m.enableFloat;
       _islandTimeout = m.islandTimeout;
+      _marquee       = m.marquee;
       _timeoutController = TextEditingController(text: m.islandTimeout);
     } else {
       _timeoutController = TextEditingController();
@@ -185,7 +189,8 @@ class _BatchChannelSettingsSheetState
       _focusNotif != null ||
       _firstFloat != null ||
       _enableFloat != null ||
-      _islandTimeout != null;
+      _islandTimeout != null ||
+      _marquee != null;
 
   String _title(AppLocalizations l10n) => switch (widget.mode) {
         SingleChannelMode m => m.channelName,
@@ -215,6 +220,7 @@ class _BatchChannelSettingsSheetState
           'first_float':  _firstFloat,
           'enable_float': _enableFloat,
           'timeout':      _islandTimeout,
+          'marquee':      _marquee,
         },
         onlyEnabled: switch (widget.mode) {
           BatchChannelMode(scope: SingleAppScope()) => _onlyEnabled,
@@ -381,6 +387,19 @@ class _BatchChannelSettingsSheetState
                       DropdownMenuItem(value: kTriOptOff,     child: Text(l10n.optOff)),
                     ],
                     onChanged: (v) => setState(() => _enableFloat = v),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // 滚动岛
+                  _BatchSettingRow(
+                    label: l10n.marqueeChannelTitle,
+                    value: _marquee,
+                    showNotChange: !_isSingle,
+                    items: [
+                      DropdownMenuItem(value: kTriOptOn,  child: Text(l10n.optOn)),
+                      DropdownMenuItem(value: kTriOptOff, child: Text(l10n.optOff)),
+                    ],
+                    onChanged: (v) => setState(() => _marquee = v),
                   ),
                   const SizedBox(height: 12),
 

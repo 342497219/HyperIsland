@@ -59,6 +59,7 @@
   "roundIconSubtitle": "通知アイコンの角を丸めます",
   "marqueeFeatureTitle": "スクロールアイランド (実験的)",
   "marqueeFeatureSubtitle": "長いテキストの通知を自動スクロールします",
+  "marqueeChannelTitle": "スクロールアイランド",
   "marqueeSpeedTitle": "スクロール速度",
   "marqueeSpeedLabel": "{speed} px/秒",
   "@marqueeSpeedLabel": {

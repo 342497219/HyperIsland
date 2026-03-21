@@ -165,6 +165,11 @@ class _AppChannelsPageState extends State<AppChannelsPage> {
     await widget.controller.setChannelTimeout(widget.app.packageName, channelId, value);
   }
 
+  Future<void> _setMarquee(String channelId, String value) async {
+    _updateExtra(channelId, 'marquee', value);
+    await widget.controller.setChannelMarquee(widget.app.packageName, channelId, value);
+  }
+
   Future<void> _applyChannelSettings(String channelId, Map<String, String?> settings) async {
     if (settings['template'] case final t?) await _setTemplate(channelId, t);
     if (settings['icon'] case final v?) await _setIconMode(channelId, v);
@@ -173,6 +178,7 @@ class _AppChannelsPageState extends State<AppChannelsPage> {
     if (settings['first_float'] case final v?) await _setFirstFloat(channelId, v);
     if (settings['enable_float'] case final v?) await _setEnableFloat(channelId, v);
     if (settings['timeout'] case final v?) await _setIslandTimeout(channelId, v);
+    if (settings['marquee'] case final v?) await _setMarquee(channelId, v);
   }
 
   // ── 批量操作 ────────────────────────────────────────────────────────────────
@@ -404,6 +410,7 @@ class _AppChannelsPageState extends State<AppChannelsPage> {
                       firstFloat: extras['first_float'] ?? kTriOptDefault,
                       enableFloat: extras['enable_float'] ?? kTriOptDefault,
                       islandTimeout: extras['timeout'] ?? '5',
+                      marquee: extras['marquee'] ?? kTriOptOff,
                       onToggle: (v) => _toggle(ch.id, v),
                       onSettingsApplied: (s) => _applyChannelSettings(ch.id, s),
                     );
@@ -437,6 +444,7 @@ class _ChannelTile extends StatelessWidget {
     required this.firstFloat,
     required this.enableFloat,
     required this.islandTimeout,
+    required this.marquee,
     required this.onToggle,
     required this.onSettingsApplied,
   });
@@ -455,6 +463,7 @@ class _ChannelTile extends StatelessWidget {
   final String firstFloat;
   final String enableFloat;
   final String islandTimeout;
+  final String marquee;
   final ValueChanged<bool> onToggle;
   final ValueChanged<Map<String, String?>> onSettingsApplied;
 
@@ -470,6 +479,7 @@ class _ChannelTile extends StatelessWidget {
         firstFloat:    firstFloat,
         enableFloat:   enableFloat,
         islandTimeout: islandTimeout,
+        marquee:       marquee,
       ),
       templateLabels: templateLabels,
     );

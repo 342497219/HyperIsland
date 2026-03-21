@@ -3,6 +3,7 @@ package io.github.hyperisland.xposed
 import android.app.Notification
 import android.service.notification.StatusBarNotification
 import io.github.hyperisland.getAppIcon
+import io.github.hyperisland.xposed.hook.MarqueeHook
 import io.github.hyperisland.xposed.templates.GenericProgressIslandNotification
 import io.github.hyperisland.xposed.templates.NotificationIslandNotification
 import de.robv.android.xposed.IXposedHookLoadPackage
@@ -305,6 +306,11 @@ class GenericProgressHook : IXposedHookLoadPackage {
                 context, "focus_icon:$pkg/$channelId",
                 "pref_channel_focus_icon_${pkg}_$channelId", "auto"
             )
+            val marqueeEnabled = loadChannelStringSetting(
+                context, "marquee:$pkg/$channelId",
+                "pref_channel_marquee_${pkg}_$channelId", "off"
+            ) == "on"
+            MarqueeHook.pendingMarqueeEnabled = marqueeEnabled
 
             XposedBridge.log(
                 "HyperIsland[Generic]: $pkg/$channelId | $title | $progressPercent% | template=$template | buttons=${actions.size} | largeIcon=${largeIcon != null}"

@@ -170,6 +170,9 @@ class AppLocalizationsJa extends AppLocalizations {
   String get marqueeFeatureSubtitle => '長いテキストの通知を自動スクロールします';
 
   @override
+  String get marqueeChannelTitle => 'スクロールアイランド';
+
+  @override
   String get marqueeSpeedTitle => 'スクロール速度';
 
   @override

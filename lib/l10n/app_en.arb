@@ -59,6 +59,7 @@
   "roundIconSubtitle": "Add rounded corners to notification icons",
   "marqueeFeatureTitle": "Scrolling Island (Experimental)",
   "marqueeFeatureSubtitle": "Auto scroll long text notification",
+  "marqueeChannelTitle": "Scrolling Island",
   "marqueeSpeedTitle": "Scroll Speed",
   "marqueeSpeedLabel": "{speed} px/s",
   "@marqueeSpeedLabel": {

@@ -74,6 +74,7 @@
   "roundIconSubtitle": "为通知图标添加圆角效果",
   "marqueeFeatureTitle": "滚动岛 (实验性)",
   "marqueeFeatureSubtitle": "长文本通知自动滚动显示",
+  "marqueeChannelTitle": "滚动岛",
   "marqueeSpeedTitle": "滚动速度",
   "marqueeSpeedLabel": "{speed} 像素/秒",
   "@marqueeSpeedLabel": {

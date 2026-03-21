@@ -249,7 +249,7 @@ class WhitelistController extends ChangeNotifier {
 
   // ── 渠道级额外设置（图标、焦点通知、初次展开、更新展开）────────────────────
 
-  /// 批量读取各渠道的额外设置，返回 channelId → {icon, focus_icon, focus, first_float, enable_float, timeout}。
+  /// 批量读取各渠道的额外设置，返回 channelId → {icon, focus_icon, focus, first_float, enable_float, timeout, marquee}。
   Future<Map<String, Map<String, String>>> getChannelExtraSettings(
       String packageName, List<String> channelIds) async {
     final prefs = await SharedPreferences.getInstance();
@@ -260,6 +260,7 @@ class WhitelistController extends ChangeNotifier {
           'first_float': prefs.getString('pref_channel_first_float_${packageName}_$id') ?? kTriOptDefault,
           'enable_float': prefs.getString('pref_channel_enable_float_${packageName}_$id') ?? kTriOptDefault,
           'timeout': prefs.getString('pref_channel_timeout_${packageName}_$id') ?? '5',
+          'marquee': prefs.getString('pref_channel_marquee_${packageName}_$id') ?? kTriOptOff,
         })));
   }
 
@@ -299,6 +300,12 @@ class WhitelistController extends ChangeNotifier {
     await prefs.setString('pref_channel_timeout_${packageName}_$channelId', value);
   }
 
+  Future<void> setChannelMarquee(
+      String packageName, String channelId, String value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('pref_channel_marquee_${packageName}_$channelId', value);
+  }
+
   /// 批量应用渠道配置到指定渠道列表。
   /// [settings] 中 null 值的 key 表示不更改该项。
   Future<void> batchApplyChannelSettings(
@@ -315,6 +322,7 @@ class WhitelistController extends ChangeNotifier {
       'first_float':  'pref_channel_first_float',
       'enable_float': 'pref_channel_enable_float',
       'timeout':      'pref_channel_timeout',
+      'marquee':      'pref_channel_marquee',
     };
     final futures = <Future<bool>>[];
     for (final id in channelIds) {

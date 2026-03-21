@@ -400,6 +400,12 @@ abstract class AppLocalizations {
   /// **'长文本通知自动滚动显示'**
   String get marqueeFeatureSubtitle;
 
+  /// No description provided for @marqueeChannelTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'滚动岛'**
+  String get marqueeChannelTitle;
+
   /// No description provided for @marqueeSpeedTitle.
   ///
   /// In zh, this message translates to:
