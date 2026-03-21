@@ -74,6 +74,8 @@
   "roundIconSubtitle": "为通知图标添加圆角效果",
   "marqueeFeatureTitle": "滚动岛 (实验性)",
   "marqueeFeatureSubtitle": "长文本通知自动滚动显示",
+  "wrapLongTextTitle": "自动折行 (实验性)",
+  "wrapLongTextSubtitle": "焦点通知长文本自动拆分为两行显示",
   "themeModeTitle": "颜色模式",
   "themeModeSystem": "跟随系统",
   "themeModeLight": "浅色",

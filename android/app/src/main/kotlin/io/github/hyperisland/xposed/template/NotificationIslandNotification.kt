@@ -196,7 +196,8 @@ object NotificationIslandNotification : IslandTemplate {
             // HyperOS 从 extras 顶层查找 action，将嵌套 bundle 展开
             flattenActionsToExtras(resourceBundle, extras)
             // 修正 textButton 字段名：新库输出 "actionIntent"，HyperOS V3 协议只认 "action"
-            val jsonParam = fixTextButtonJson(builder.buildJsonParam())
+            val wrapLongText = isWrapLongTextEnabled(context)
+            val jsonParam = fixTextButtonJson(builder.buildJsonParam(), wrapLongText)
                 .let { if (!isOngoing) injectUpdatable(it, false) else it }
             extras.putString("miui.focus.param", jsonParam)
 
@@ -219,7 +220,7 @@ object NotificationIslandNotification : IslandTemplate {
         } catch (_: Exception) { jsonParam }
     }
 
-    private fun fixTextButtonJson(jsonParam: String): String {
+    private fun fixTextButtonJson(jsonParam: String, wrapLongText: Boolean = false): String {
         return try {
             val json = org.json.JSONObject(jsonParam)
             val pv2  = json.optJSONObject("param_v2") ?: return jsonParam
@@ -235,6 +236,7 @@ object NotificationIslandNotification : IslandTemplate {
             }
 
             // 处理超长文本：将 iconTextInfo 转换为 coverInfo，使 content/subContent 上下两行显示
+            if (wrapLongText) {
             val iconTextInfo = pv2.optJSONObject("iconTextInfo")
             if (iconTextInfo != null) {
                 val content = iconTextInfo.optString("content", "")
@@ -269,9 +271,20 @@ object NotificationIslandNotification : IslandTemplate {
                     }
                 }
             }
+            } // wrapLongText
 
             json.toString()
         } catch (_: Exception) { jsonParam }
+    }
+
+    private fun isWrapLongTextEnabled(context: Context): Boolean {
+        return try {
+            val uri = android.net.Uri.parse("content://io.github.hyperisland.settings/pref_wrap_long_text")
+            context.contentResolver.query(uri, null, null, null, null)
+                ?.use { if (it.moveToFirst()) it.getInt(0) != 0 else false } ?: false
+        } catch (_: Exception) {
+            false
+        }
     }
 
     /** 将 buildResourceBundle() 里嵌套的 "miui.focus.actions" 展开到 extras 顶层 */

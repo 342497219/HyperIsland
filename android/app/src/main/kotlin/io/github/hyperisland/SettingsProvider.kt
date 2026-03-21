@@ -62,7 +62,7 @@ class SettingsProvider : ContentProvider() {
             try { if (prefs.getBoolean(flutterKey, true)) 1 else 0 }
             catch (_: ClassCastException) { 1 }
         } else {
-            if (segment == "pref_marquee_feature") 0 else 1 // 默认开启
+            if (segment == "pref_marquee_feature" || segment == "pref_wrap_long_text") 0 else 1 // 默认开启
         }
         cursor.newRow().add(value)
         return cursor

@@ -167,6 +167,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get marqueeFeatureSubtitle => '长文本通知自动滚动显示';
 
   @override
+  String get wrapLongTextTitle => '自动折行 (实验性)';
+
+  @override
+  String get wrapLongTextSubtitle => '焦点通知长文本自动拆分为两行显示';
+
+  @override
   String get themeModeTitle => '颜色模式';
 
   @override

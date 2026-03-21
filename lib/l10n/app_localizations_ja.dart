@@ -170,6 +170,12 @@ class AppLocalizationsJa extends AppLocalizations {
   String get marqueeFeatureSubtitle => '長いテキストの通知を自動スクロールします';
 
   @override
+  String get wrapLongTextTitle => '自動折り返し (実験的)';
+
+  @override
+  String get wrapLongTextSubtitle => 'フォーカス通知の長いテキストを2行に分割して表示します';
+
+  @override
   String get themeModeTitle => 'カラーモード';
 
   @override

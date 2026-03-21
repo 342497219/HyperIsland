@@ -59,6 +59,8 @@
   "roundIconSubtitle": "Add rounded corners to notification icons",
   "marqueeFeatureTitle": "Scrolling Island (Experimental)",
   "marqueeFeatureSubtitle": "Auto scroll long text notification",
+  "wrapLongTextTitle": "Auto Wrap (Experimental)",
+  "wrapLongTextSubtitle": "Split long focus notification text into two lines",
   "themeModeTitle": "Color mode",
   "themeModeSystem": "Follow system",
   "themeModeLight": "Light",

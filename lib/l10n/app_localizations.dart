@@ -400,6 +400,18 @@ abstract class AppLocalizations {
   /// **'长文本通知自动滚动显示'**
   String get marqueeFeatureSubtitle;
 
+  /// No description provided for @wrapLongTextTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'自动折行 (实验性)'**
+  String get wrapLongTextTitle;
+
+  /// No description provided for @wrapLongTextSubtitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'焦点通知长文本自动拆分为两行显示'**
+  String get wrapLongTextSubtitle;
+
   /// No description provided for @themeModeTitle.
   ///
   /// In zh, this message translates to:

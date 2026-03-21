@@ -59,6 +59,8 @@
   "roundIconSubtitle": "通知アイコンの角を丸めます",
   "marqueeFeatureTitle": "スクロールアイランド (実験的)",
   "marqueeFeatureSubtitle": "長いテキストの通知を自動スクロールします",
+  "wrapLongTextTitle": "自動折り返し (実験的)",
+  "wrapLongTextSubtitle": "フォーカス通知の長いテキストを2行に分割して表示します",
   "themeModeTitle": "カラーモード",
   "themeModeSystem": "システムに従う",
   "themeModeLight": "ライト",
