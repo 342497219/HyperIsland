@@ -103,7 +103,7 @@ flutter build apk --target-platform=android-arm64
 
 ## 📄 License
 
-This project is open source under the [LICENSE](LICENSE). Issues and PRs are welcome.
+This project is open source under the [MIT License](LICENSE). Issues and PRs are welcome.
 
 <div align="center">
 
