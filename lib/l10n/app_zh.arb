@@ -72,9 +72,7 @@
   "useAppIconSubtitle": "下载管理器通知使用应用图标",
   "roundIconTitle": "图标圆角",
   "roundIconSubtitle": "为通知图标添加圆角效果",
-  "marqueeFeatureTitle": "滚动岛 (实验性)",
-  "marqueeFeatureSubtitle": "长文本通知自动滚动显示",
-  "marqueeChannelTitle": "滚动岛",
+  "marqueeChannelTitle": "消息滚动",
   "marqueeSpeedTitle": "滚动速度",
   "marqueeSpeedLabel": "{speed} 像素/秒",
   "@marqueeSpeedLabel": {
@@ -239,6 +237,7 @@
 
   "templateDownloadName": "下载",
   "templateNotificationIslandName": "通知超级岛",
+  "islandSection": "岛",
 
   "template": "模板",
   "islandIcon": "超级岛图标",

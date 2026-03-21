@@ -388,22 +388,10 @@ abstract class AppLocalizations {
   /// **'为通知图标添加圆角效果'**
   String get roundIconSubtitle;
 
-  /// No description provided for @marqueeFeatureTitle.
-  ///
-  /// In zh, this message translates to:
-  /// **'滚动岛 (实验性)'**
-  String get marqueeFeatureTitle;
-
-  /// No description provided for @marqueeFeatureSubtitle.
-  ///
-  /// In zh, this message translates to:
-  /// **'长文本通知自动滚动显示'**
-  String get marqueeFeatureSubtitle;
-
   /// No description provided for @marqueeChannelTitle.
   ///
   /// In zh, this message translates to:
-  /// **'滚动岛'**
+  /// **'消息滚动'**
   String get marqueeChannelTitle;
 
   /// No description provided for @marqueeSpeedTitle.
@@ -843,6 +831,12 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'通知超级岛'**
   String get templateNotificationIslandName;
+
+  /// No description provided for @islandSection.
+  ///
+  /// In zh, this message translates to:
+  /// **'岛'**
+  String get islandSection;
 
   /// No description provided for @template.
   ///

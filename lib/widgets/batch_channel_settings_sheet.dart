@@ -304,7 +304,9 @@ class _BatchChannelSettingsSheetState
                     const SizedBox(height: 16),
                   ],
 
-                  // 模板
+                  // ── 模板设置 ───────────────────────────────────────────
+                  _SectionLabel(l10n.template),
+                  const SizedBox(height: 8),
                   _BatchSettingRow(
                     label: l10n.template,
                     value: _template,
@@ -317,9 +319,11 @@ class _BatchChannelSettingsSheetState
                         .toList(),
                     onChanged: (v) => setState(() => _template = v),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 20),
 
-                  // 超级岛图标
+                  // ── 超级岛 ─────────────────────────────────────────────
+                  _SectionLabel(l10n.islandSection),
+                  const SizedBox(height: 8),
                   _BatchSettingRow(
                     label: l10n.islandIcon,
                     value: _iconMode,
@@ -333,36 +337,6 @@ class _BatchChannelSettingsSheetState
                     onChanged: (v) => setState(() => _iconMode = v),
                   ),
                   const SizedBox(height: 12),
-
-                  // 焦点图标
-                  _BatchSettingRow(
-                    label: l10n.focusIconLabel,
-                    value: _focusIconMode,
-                    showNotChange: !_isSingle,
-                    items: [
-                      DropdownMenuItem(value: kIconModeAuto,       child: Text(l10n.iconModeAuto)),
-                      DropdownMenuItem(value: kIconModeNotifSmall, child: Text(l10n.iconModeNotifSmall)),
-                      DropdownMenuItem(value: kIconModeNotifLarge, child: Text(l10n.iconModeNotifLarge)),
-                      DropdownMenuItem(value: kIconModeAppIcon,    child: Text(l10n.iconModeAppIcon)),
-                    ],
-                    onChanged: (v) => setState(() => _focusIconMode = v),
-                  ),
-                  const SizedBox(height: 12),
-
-                  // 焦点通知
-                  _BatchSettingRow(
-                    label: l10n.focusNotificationLabel,
-                    value: _focusNotif,
-                    showNotChange: !_isSingle,
-                    items: [
-                      DropdownMenuItem(value: kTriOptDefault, child: Text(l10n.optDefault)),
-                      DropdownMenuItem(value: kTriOptOff,     child: Text(l10n.optOff)),
-                    ],
-                    onChanged: (v) => setState(() => _focusNotif = v),
-                  ),
-                  const SizedBox(height: 12),
-
-                  // 初次展开
                   _BatchSettingRow(
                     label: l10n.firstFloatLabel,
                     value: _firstFloat,
@@ -375,8 +349,6 @@ class _BatchChannelSettingsSheetState
                     onChanged: (v) => setState(() => _firstFloat = v),
                   ),
                   const SizedBox(height: 12),
-
-                  // 更新展开
                   _BatchSettingRow(
                     label: l10n.updateFloatLabel,
                     value: _enableFloat,
@@ -389,8 +361,6 @@ class _BatchChannelSettingsSheetState
                     onChanged: (v) => setState(() => _enableFloat = v),
                   ),
                   const SizedBox(height: 12),
-
-                  // 滚动岛
                   _BatchSettingRow(
                     label: l10n.marqueeChannelTitle,
                     value: _marquee,
@@ -402,7 +372,6 @@ class _BatchChannelSettingsSheetState
                     onChanged: (v) => setState(() => _marquee = v),
                   ),
                   const SizedBox(height: 12),
-
                   // 自动消失
                   Row(
                     children: [
@@ -451,6 +420,34 @@ class _BatchChannelSettingsSheetState
                       ),
                     ],
                   ),
+                  const SizedBox(height: 20),
+
+                  // ── 焦点通知 ───────────────────────────────────────────
+                  _SectionLabel(l10n.focusNotificationLabel),
+                  const SizedBox(height: 8),
+                  _BatchSettingRow(
+                    label: l10n.focusIconLabel,
+                    value: _focusIconMode,
+                    showNotChange: !_isSingle,
+                    items: [
+                      DropdownMenuItem(value: kIconModeAuto,       child: Text(l10n.iconModeAuto)),
+                      DropdownMenuItem(value: kIconModeNotifSmall, child: Text(l10n.iconModeNotifSmall)),
+                      DropdownMenuItem(value: kIconModeNotifLarge, child: Text(l10n.iconModeNotifLarge)),
+                      DropdownMenuItem(value: kIconModeAppIcon,    child: Text(l10n.iconModeAppIcon)),
+                    ],
+                    onChanged: (v) => setState(() => _focusIconMode = v),
+                  ),
+                  const SizedBox(height: 12),
+                  _BatchSettingRow(
+                    label: l10n.focusNotificationLabel,
+                    value: _focusNotif,
+                    showNotChange: !_isSingle,
+                    items: [
+                      DropdownMenuItem(value: kTriOptDefault, child: Text(l10n.optDefault)),
+                      DropdownMenuItem(value: kTriOptOff,     child: Text(l10n.optOff)),
+                    ],
+                    onChanged: (v) => setState(() => _focusNotif = v),
+                  ),
                   const SizedBox(height: 24),
                 ],
               ),
@@ -494,6 +491,28 @@ class _BatchChannelSettingsSheetState
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ── 分组标题 ──────────────────────────────────────────────────────────────────
+
+class _SectionLabel extends StatelessWidget {
+  const _SectionLabel(this.label);
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Text(
+        label,
+        style: Theme.of(context).textTheme.labelMedium?.copyWith(
+              color: cs.primary,
+              fontWeight: FontWeight.w600,
+            ),
       ),
     );
   }

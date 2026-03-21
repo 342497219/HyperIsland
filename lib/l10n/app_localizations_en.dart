@@ -170,13 +170,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get roundIconSubtitle => 'Add rounded corners to notification icons';
 
   @override
-  String get marqueeFeatureTitle => 'Scrolling Island (Experimental)';
-
-  @override
-  String get marqueeFeatureSubtitle => 'Auto scroll long text notification';
-
-  @override
-  String get marqueeChannelTitle => 'Scrolling Island';
+  String get marqueeChannelTitle => 'Text Scrolling Island';
 
   @override
   String get marqueeSpeedTitle => 'Scroll Speed';
@@ -437,6 +431,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get templateNotificationIslandName => 'Notification Island';
+
+  @override
+  String get islandSection => 'Island';
 
   @override
   String get template => 'Template';

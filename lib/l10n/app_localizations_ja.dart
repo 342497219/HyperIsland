@@ -164,12 +164,6 @@ class AppLocalizationsJa extends AppLocalizations {
   String get roundIconSubtitle => '通知アイコンの角を丸めます';
 
   @override
-  String get marqueeFeatureTitle => 'スクロールアイランド (実験的)';
-
-  @override
-  String get marqueeFeatureSubtitle => '長いテキストの通知を自動スクロールします';
-
-  @override
   String get marqueeChannelTitle => 'スクロールアイランド';
 
   @override
@@ -425,6 +419,9 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get templateNotificationIslandName => '通知 Island';
+
+  @override
+  String get islandSection => 'Island';
 
   @override
   String get template => 'テンプレート';

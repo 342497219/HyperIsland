@@ -57,9 +57,7 @@
   "useAppIconSubtitle": "Use app icon for Download Manager notifications",
   "roundIconTitle": "Round icon corners",
   "roundIconSubtitle": "Add rounded corners to notification icons",
-  "marqueeFeatureTitle": "Scrolling Island (Experimental)",
-  "marqueeFeatureSubtitle": "Auto scroll long text notification",
-  "marqueeChannelTitle": "Scrolling Island",
+  "marqueeChannelTitle": "Text Scrolling Island",
   "marqueeSpeedTitle": "Scroll Speed",
   "marqueeSpeedLabel": "{speed} px/s",
   "@marqueeSpeedLabel": {
@@ -141,6 +139,7 @@
 
   "templateDownloadName": "Download",
   "templateNotificationIslandName": "Notification Island",
+  "islandSection": "Island",
 
   "template": "Template",
   "islandIcon": "Island icon",

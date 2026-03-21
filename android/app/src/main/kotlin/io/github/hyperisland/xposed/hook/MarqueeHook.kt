@@ -27,8 +27,8 @@ import java.util.WeakHashMap
 class MarqueeHook : IXposedHookLoadPackage {
 
     companion object {
-        /** 用于标记已 hook 过的 ClassLoader，防止重复 hook 同一 Factory。 */
-        private const val FIELD_HOOKED_FACTORY = "HOOKED_FACTORY_HYPERISLAND_MARQUEE"
+        /** 已 hook 过的工厂类标识，防止重复 hook。格式：className@classLoaderIdentityHash */
+        private val hookedFactories = mutableSetOf<String>()
 
         /** 存活的跑马灯控制器，使用 WeakHashMap 避免 TextView 泄漏。 */
         private val scrollerMap = WeakHashMap<TextView, MarqueeController>()
@@ -248,15 +248,9 @@ class MarqueeHook : IXposedHookLoadPackage {
     @Synchronized
     private fun doHookFactory(factoryClass: Class<*>) {
         try {
-            // 防止重复 hook：在 ClassLoader 上标记已处理标志
-            val hookedField = try {
-                factoryClass.classLoader?.javaClass
-                    ?.getDeclaredField(FIELD_HOOKED_FACTORY)
-                    ?.apply { isAccessible = true }
-            } catch (_: NoSuchFieldException) { null }
-
-            if (hookedField != null && hookedField.get(factoryClass.classLoader) == true) return
-            hookedField?.set(factoryClass.classLoader, true)
+            // 防止重复 hook：用类名 + ClassLoader 标识唯一区分
+            val key = "${factoryClass.name}@${System.identityHashCode(factoryClass.classLoader)}"
+            if (!hookedFactories.add(key)) return
 
             val targetMethod = factoryClass.declaredMethods
                 .firstOrNull { it.name == "createBigIslandTemplateView" }

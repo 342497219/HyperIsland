@@ -161,13 +161,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get roundIconSubtitle => '为通知图标添加圆角效果';
 
   @override
-  String get marqueeFeatureTitle => '滚动岛 (实验性)';
-
-  @override
-  String get marqueeFeatureSubtitle => '长文本通知自动滚动显示';
-
-  @override
-  String get marqueeChannelTitle => '滚动岛';
+  String get marqueeChannelTitle => '消息滚动';
 
   @override
   String get marqueeSpeedTitle => '滚动速度';
@@ -421,6 +415,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get templateNotificationIslandName => '通知超级岛';
+
+  @override
+  String get islandSection => '岛';
 
   @override
   String get template => '模板';
