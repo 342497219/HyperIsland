@@ -275,6 +275,24 @@ class _SettingsPageState extends State<SettingsPage> {
                         SwitchListTile(
                           contentPadding: const EdgeInsets.symmetric(
                               horizontal: 16, vertical: 4),
+                          title: Text(l10n.unlockAllFocusTitle),
+                          subtitle: Text(l10n.unlockAllFocusSubtitle),
+                          value: _ctrl.unlockAllFocus,
+                          onChanged: _ctrl.setUnlockAllFocus,
+                        ),
+                        const Divider(height: 1, indent: 16, endIndent: 16),
+                        SwitchListTile(
+                          contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 4),
+                          title: Text(l10n.unlockFocusAuthTitle),
+                          subtitle: Text(l10n.unlockFocusAuthSubtitle),
+                          value: _ctrl.unlockFocusAuth,
+                          onChanged: _ctrl.setUnlockFocusAuth,
+                        ),
+                        const Divider(height: 1, indent: 16, endIndent: 16),
+                        SwitchListTile(
+                          contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 4),
                           title: Text(l10n.checkUpdateOnLaunchTitle),
                           subtitle: Text(l10n.checkUpdateOnLaunchSubtitle),
                           value: _ctrl.checkUpdateOnLaunch,

@@ -7,6 +7,8 @@ const kPrefRoundIcon          = 'pref_round_icon';
 const kPrefMarqueeFeature     = 'pref_marquee_feature';
 const kPrefMarqueeSpeed       = 'pref_marquee_speed';
 const kPrefWrapLongText       = 'pref_wrap_long_text';
+const kPrefUnlockAllFocus     = 'pref_unlock_all_focus';
+const kPrefUnlockFocusAuth    = 'pref_unlock_focus_auth';
 const kPrefThemeMode             = 'pref_theme_mode';
 const kPrefLocale                = 'pref_locale';
 const kPrefCheckUpdateOnLaunch   = 'pref_check_update_on_launch';
@@ -23,6 +25,8 @@ class SettingsController extends ChangeNotifier {
   bool marqueeFeature = false;
   int marqueeSpeed = 100;
   bool wrapLongText = false;
+  bool unlockAllFocus = false;
+  bool unlockFocusAuth = false;
   bool checkUpdateOnLaunch = true;
   ThemeMode themeMode = ThemeMode.system;
   Locale? locale; // null = follow system
@@ -36,6 +40,8 @@ class SettingsController extends ChangeNotifier {
     marqueeFeature        = prefs.getBool(kPrefMarqueeFeature) ?? false;
     marqueeSpeed          = (prefs.getInt(kPrefMarqueeSpeed) ?? 100).clamp(20, 500);
     wrapLongText          = prefs.getBool(kPrefWrapLongText) ?? false;
+    unlockAllFocus        = prefs.getBool(kPrefUnlockAllFocus) ?? false;
+    unlockFocusAuth       = prefs.getBool(kPrefUnlockFocusAuth) ?? false;
     checkUpdateOnLaunch   = prefs.getBool(kPrefCheckUpdateOnLaunch) ?? true;
     themeMode = switch (prefs.getString(kPrefThemeMode)) {
       'light'  => ThemeMode.light,
@@ -88,6 +94,20 @@ class SettingsController extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(kPrefWrapLongText, value);
     wrapLongText = value;
+    notifyListeners();
+  }
+
+  Future<void> setUnlockAllFocus(bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(kPrefUnlockAllFocus, value);
+    unlockAllFocus = value;
+    notifyListeners();
+  }
+
+  Future<void> setUnlockFocusAuth(bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(kPrefUnlockFocusAuth, value);
+    unlockFocusAuth = value;
     notifyListeners();
   }
 

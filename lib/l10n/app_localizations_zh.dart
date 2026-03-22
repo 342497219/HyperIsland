@@ -67,6 +67,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get downloadManager => '下载管理器';
 
   @override
+  String get xmsf => '小米服务框架';
+
+  @override
   String get notificationTest => '通知测试';
 
   @override
@@ -135,6 +138,19 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get keepFocusNotifSubtitle => '显示一条通知，点击以继续下载，可能导致状态不同步';
+
+  @override
+  String get unlockAllFocusTitle => '移除焦点通知白名单';
+
+  @override
+  String get unlockAllFocusSubtitle => '允许所有应用发送焦点通知，无需系统授权';
+
+  @override
+  String get unlockFocusAuthTitle => '移除焦点通知签名验证';
+
+  @override
+  String get unlockFocusAuthSubtitle =>
+      '允许所有应用向手表/手环发送焦点通知，跳过签名校验（需 Hook 小米服务框架）';
 
   @override
   String get checkUpdateOnLaunchTitle => '启动时检查更新';

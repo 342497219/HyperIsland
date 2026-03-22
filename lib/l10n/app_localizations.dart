@@ -208,6 +208,12 @@ abstract class AppLocalizations {
   /// **'下载管理器'**
   String get downloadManager;
 
+  /// No description provided for @xmsf.
+  ///
+  /// In zh, this message translates to:
+  /// **'小米服务框架'**
+  String get xmsf;
+
   /// No description provided for @notificationTest.
   ///
   /// In zh, this message translates to:
@@ -339,6 +345,30 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'显示一条通知，点击以继续下载，可能导致状态不同步'**
   String get keepFocusNotifSubtitle;
+
+  /// No description provided for @unlockAllFocusTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'移除焦点通知白名单'**
+  String get unlockAllFocusTitle;
+
+  /// No description provided for @unlockAllFocusSubtitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'允许所有应用发送焦点通知，无需系统授权'**
+  String get unlockAllFocusSubtitle;
+
+  /// No description provided for @unlockFocusAuthTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'移除焦点通知签名验证'**
+  String get unlockFocusAuthTitle;
+
+  /// No description provided for @unlockFocusAuthSubtitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'允许所有应用向手表/手环发送焦点通知，跳过签名校验（需 Hook 小米服务框架）'**
+  String get unlockFocusAuthSubtitle;
 
   /// No description provided for @checkUpdateOnLaunchTitle.
   ///

@@ -87,6 +87,7 @@ class _HomePageState extends State<HomePage> {
     final l10n = AppLocalizations.of(context)!;
     bool restartSystemUI = true;
     bool restartDownloadManager = true;
+    bool restartXmsf = true;
 
     final confirmed = await showDialog<bool>(
       context: context,
@@ -114,6 +115,15 @@ class _HomePageState extends State<HomePage> {
                 controlAffinity: ListTileControlAffinity.leading,
                 contentPadding: EdgeInsets.zero,
               ),
+              CheckboxListTile(
+                title: Text(l10n.xmsf),
+                subtitle: const Text('com.xiaomi.xmsf'),
+                value: restartXmsf,
+                onChanged: (v) =>
+                    setDialogState(() => restartXmsf = v ?? false),
+                controlAffinity: ListTileControlAffinity.leading,
+                contentPadding: EdgeInsets.zero,
+              ),
             ],
           ),
           actions: [
@@ -131,7 +141,7 @@ class _HomePageState extends State<HomePage> {
     );
 
     if (confirmed != true) return;
-    if (!restartSystemUI && !restartDownloadManager) return;
+    if (!restartSystemUI && !restartDownloadManager && !restartXmsf) return;
 
     setState(() => _restarting = true);
     try {
@@ -139,6 +149,9 @@ class _HomePageState extends State<HomePage> {
       if (restartSystemUI) commands.add('killall com.android.systemui');
       if (restartDownloadManager) {
         commands.add('am force-stop com.android.providers.downloads');
+      }
+      if (restartXmsf) {
+        commands.add('am force-stop com.xiaomi.xmsf');
       }
       await _channel.invokeMethod('restartProcesses', {'commands': commands});
     } on PlatformException catch (e) {

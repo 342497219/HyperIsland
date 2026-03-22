@@ -67,6 +67,9 @@ class AppLocalizationsJa extends AppLocalizations {
   String get downloadManager => 'ダウンロードマネージャー';
 
   @override
+  String get xmsf => '小米サービスフレームワーク (XMSF)';
+
+  @override
   String get notificationTest => '通知のテスト';
 
   @override
@@ -138,6 +141,19 @@ class AppLocalizationsJa extends AppLocalizations {
   @override
   String get keepFocusNotifSubtitle =>
       'ダウンロードを再開するためのフォーカス通知を表示しますが、状態の同期でズレが発生する可能性があります';
+
+  @override
+  String get unlockAllFocusTitle => 'フォーカス通知のホワイトリストを解除';
+
+  @override
+  String get unlockAllFocusSubtitle => 'システムの許可なしに、すべてのアプリがフォーカス通知を送信できるようにします';
+
+  @override
+  String get unlockFocusAuthTitle => 'フォーカス通知の署名検証を解除';
+
+  @override
+  String get unlockFocusAuthSubtitle =>
+      'すべてのアプリがウォッチ/ブレスレットにフォーカス通知を送信できるようにします（XMSF のフック必要）';
 
   @override
   String get checkUpdateOnLaunchTitle => '起動時に更新を確認する';

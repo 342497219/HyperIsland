@@ -74,7 +74,11 @@ class SettingsProvider : ContentProvider() {
             try { if (prefs.getBoolean(flutterKey, true)) 1 else 0 }
             catch (_: ClassCastException) { 1 }
         } else {
-            if (segment == "pref_marquee_feature" || segment == "pref_wrap_long_text") 0 else 1 // 默认开启
+            // 以下 key 默认关闭（0）；其余 key 默认开启（1）
+            if (segment == "pref_marquee_feature" ||
+                segment == "pref_wrap_long_text" ||
+                segment == "pref_unlock_all_focus" ||
+                segment == "pref_unlock_focus_auth") 0 else 1
         }
         cursor.newRow().add(value)
         return cursor

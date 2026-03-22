@@ -67,6 +67,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get downloadManager => 'Download Manager';
 
   @override
+  String get xmsf => 'XMSF (Xiaomi Service Framework)';
+
+  @override
   String get notificationTest => 'Notification Test';
 
   @override
@@ -142,6 +145,21 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get keepFocusNotifSubtitle =>
       'Show a notification to resume download, may cause state desync';
+
+  @override
+  String get unlockAllFocusTitle => 'Remove focus notification whitelist';
+
+  @override
+  String get unlockAllFocusSubtitle =>
+      'Allow all apps to send focus notifications without system authorization';
+
+  @override
+  String get unlockFocusAuthTitle =>
+      'Remove focus notification signature verification';
+
+  @override
+  String get unlockFocusAuthSubtitle =>
+      'Allow all apps to send focus notifications to watch/bracelet, bypassing signature check (requires hooking XMSF)';
 
   @override
   String get checkUpdateOnLaunchTitle => 'Check for updates on launch';

@@ -3,3 +3,5 @@ io.github.hyperisland.xposed.DownloadHook
 io.github.hyperisland.xposed.GenericProgressHook
 io.github.hyperisland.xposed.IslandDispatcherHook
 io.github.hyperisland.xposed.hook.MarqueeHook
+io.github.hyperisland.xposed.hook.UnlockAllFocusHook
+io.github.hyperisland.xposed.hook.UnlockFocusAuthHook
