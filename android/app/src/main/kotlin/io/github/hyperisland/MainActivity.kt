@@ -12,8 +12,26 @@ import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 import java.io.ByteArrayOutputStream
+import java.util.LinkedHashMap
 
 class MainActivity : FlutterActivity() {
+    private data class StrictParseResult(
+        val channels: List<Map<String, Any?>>,
+        val enteredTargetPackage: Boolean,
+        val completedTargetPackage: Boolean,
+    )
+
+    private data class PackageFragment(
+        val content: String,
+        val endReason: String,
+        val hasClosingTag: Boolean,
+    )
+
+    private data class FallbackParseResult(
+        val channels: List<Map<String, Any?>>,
+        val source: String,
+    )
+
     private val CHANNEL = "io.github.hyperisland/test"
     private val TAG = "HyperIsland"
     private val REQUEST_APP_LIST_PERMISSION = 1002
@@ -139,17 +157,59 @@ class MainActivity : FlutterActivity() {
     }
 
     private fun tryGetChannelsFromPolicyFile(pkg: String): List<Map<String, Any?>>? {
-        return try {
-            val xml = convertAbxPolicyToXml()
-            if (xml.isEmpty()) {
-                Log.w(TAG, "convertAbxPolicyToXml: empty (ROOT权限不足?)")
-                return null
-            }
-            Log.d(TAG, "policy xml: ${xml.length} chars")
-            parseTextXmlChannels(xml.toByteArray(Charsets.UTF_8), pkg)
+        val xml = try {
+            convertAbxPolicyToXml()
         } catch (e: Exception) {
-            Log.e(TAG, "tryGetChannelsFromPolicyFile: ${e.message}")
-            null
+            Log.e(TAG, "convertAbxPolicyToXml failed for $pkg: ${e.message}")
+            return null
+        }
+        if (xml.isEmpty()) {
+            Log.w(TAG, "convertAbxPolicyToXml: empty (ROOT权限不足?)")
+            return null
+        }
+
+        val containsTarget = xml.contains(pkg)
+        val targetIndex = xml.indexOf(pkg)
+        val sanitizedXml = sanitizeInvalidXml(xml)
+        Log.d(
+            TAG,
+            "policy xml: ${xml.length} chars, sanitized=${sanitizedXml.length} chars, targetPkg=$pkg, containsTarget=$containsTarget, targetIndex=$targetIndex"
+        )
+
+        return try {
+            val strictResult = try {
+                parseTextXmlChannels(sanitizedXml, pkg)
+            } catch (e: Exception) {
+                Log.e(TAG, "strict parse failed for $pkg: ${e.message}")
+                null
+            }
+
+            if (strictResult != null) {
+                Log.d(
+                    TAG,
+                    "strict parse state: targetPkg=$pkg entered=${strictResult.enteredTargetPackage} completed=${strictResult.completedTargetPackage} count=${strictResult.channels.size}"
+                )
+                if (strictResult.completedTargetPackage) {
+                    logChannelSource(pkg, "strict", strictResult.channels.size)
+                    return strictResult.channels
+                }
+            }
+
+            if (strictResult == null || (!strictResult.completedTargetPackage && containsTarget)) {
+                Log.d(TAG, "fallback parse start: targetPkg=$pkg reason=${if (strictResult == null) "strict-error" else "strict-miss"}")
+                val fallbackResult = parseTextXmlChannelsFallback(sanitizedXml, pkg)
+                if (fallbackResult != null) {
+                    logChannelSource(pkg, fallbackResult.source, fallbackResult.channels.size)
+                    return fallbackResult.channels
+                }
+            }
+
+            logChannelSource(pkg, "empty", 0)
+            emptyList()
+        } catch (e: Exception) {
+            Log.e(TAG, "tryGetChannelsFromPolicyFile parse flow failed for $pkg: ${e.message}", e)
+            logChannelSource(pkg, "empty", 0)
+            emptyList()
         }
     }
 
@@ -184,43 +244,285 @@ class MainActivity : FlutterActivity() {
         return ""
     }
 
-    /** 文本 XML 解析（Android 8-11）。属性名可能带 -int / -bool 后缀。 */
-    private fun parseTextXmlChannels(bytes: ByteArray, targetPkg: String): List<Map<String, Any?>> {
+    /** 文本 XML 严格解析。命中目标 package 后在该 package 结束时立即返回。 */
+    private fun parseTextXmlChannels(xml: String, targetPkg: String): StrictParseResult {
         val result = mutableListOf<Map<String, Any?>>()
-        try {
-            val parser = android.util.Xml.newPullParser()
-            parser.setInput(java.io.ByteArrayInputStream(bytes), "UTF-8")
-            var inTarget = false
-            var ev = parser.eventType
-            while (ev != org.xmlpull.v1.XmlPullParser.END_DOCUMENT) {
-                when (ev) {
-                    org.xmlpull.v1.XmlPullParser.START_TAG -> when (parser.name) {
-                        "package" -> inTarget = parser.getAttributeValue(null, "name") == targetPkg
-                        "channel" -> if (inTarget) {
-                            val id = parser.getAttributeValue(null, "id") ?: ""
-                            if (id.isNotEmpty()) result.add(mapOf(
-                                "id"          to id,
-                                "name"        to (parser.getAttributeValue(null, "name") ?: id),
-                                "description" to (parser.getAttributeValue(null, "desc") ?: ""),
-                                "importance"  to (
-                                    (parser.getAttributeValue(null, "importance")
-                                        ?: parser.getAttributeValue(null, "importance-int"))
-                                        ?.toIntOrNull() ?: 3),
-                            ))
+        val parser = android.util.Xml.newPullParser()
+        parser.setInput(java.io.StringReader(xml))
+
+        var inTarget = false
+        var enteredTarget = false
+        var ev = parser.eventType
+        while (ev != org.xmlpull.v1.XmlPullParser.END_DOCUMENT) {
+            when (ev) {
+                org.xmlpull.v1.XmlPullParser.START_TAG -> when (parser.name) {
+                    "package" -> {
+                        val packageName = parser.getAttributeValue(null, "name")
+                        if (packageName == targetPkg) {
+                            inTarget = true
+                            enteredTarget = true
+                            Log.d(TAG, "strict parse entered target package: $targetPkg")
                         }
                     }
-                    org.xmlpull.v1.XmlPullParser.END_TAG ->
-                        if (parser.name == "package") inTarget = false
+
+                    "channel" -> if (inTarget) {
+                        buildChannelMap(
+                            id = parser.getAttributeValue(null, "id"),
+                            name = parser.getAttributeValue(null, "name"),
+                            description = parser.getAttributeValue(null, "desc"),
+                            importance = parser.getAttributeValue(null, "importance"),
+                            importanceInt = parser.getAttributeValue(null, "importance-int"),
+                        )?.let(result::add)
+                    }
+                }
+
+                org.xmlpull.v1.XmlPullParser.END_TAG -> if (parser.name == "package" && inTarget) {
+                    Log.d(TAG, "strict parse completed target package: $targetPkg, count=${result.size}")
+                    return StrictParseResult(
+                        channels = result,
+                        enteredTargetPackage = enteredTarget,
+                        completedTargetPackage = true,
+                    )
+                }
+            }
+            ev = parser.next()
+        }
+
+        return StrictParseResult(
+            channels = result,
+            enteredTargetPackage = enteredTarget,
+            completedTargetPackage = false,
+        )
+    }
+
+    private fun parseTextXmlChannelsFallback(xml: String, targetPkg: String): FallbackParseResult? {
+        val fragment = extractTargetPackageFragment(xml, targetPkg)
+        if (fragment == null) {
+            Log.d(TAG, "fallback fragment not found: targetPkg=$targetPkg")
+            return null
+        }
+
+        Log.d(
+            TAG,
+            "fallback fragment found: targetPkg=$targetPkg endReason=${fragment.endReason} hasClosingTag=${fragment.hasClosingTag} length=${fragment.content.length}"
+        )
+
+        val fragmentChannels = tryParseChannelsFromFragment(fragment)
+        if (fragmentChannels != null) {
+            Log.d(TAG, "fallback fragment parser result: targetPkg=$targetPkg count=${fragmentChannels.size}")
+            if (fragmentChannels.isNotEmpty() || !fragment.content.contains("<channel")) {
+                return FallbackParseResult(fragmentChannels, "fallback-fragment")
+            }
+        }
+
+        val scannedChannels = scanChannelsFromFragment(fragment.content)
+        Log.d(TAG, "fallback channel scan result: targetPkg=$targetPkg count=${scannedChannels.size}")
+        return FallbackParseResult(scannedChannels, "fallback-scan")
+    }
+
+    private fun extractTargetPackageFragment(xml: String, targetPkg: String): PackageFragment? {
+        val pattern = Regex(
+            """<package\b[^>]*\bname\s*=\s*(["'])${Regex.escape(targetPkg)}\1[^>]*>"""
+        )
+        val startMatch = pattern.find(xml) ?: return null
+        val startIndex = startMatch.range.first
+        val closingTag = "</package>"
+        val closingIndex = xml.indexOf(closingTag, startIndex)
+        if (closingIndex >= 0) {
+            return PackageFragment(
+                content = xml.substring(startIndex, closingIndex + closingTag.length),
+                endReason = "closing-tag",
+                hasClosingTag = true,
+            )
+        }
+
+        val nextPackageIndex = xml.indexOf("<package", startIndex + startMatch.value.length)
+        if (nextPackageIndex >= 0) {
+            return PackageFragment(
+                content = xml.substring(startIndex, nextPackageIndex),
+                endReason = "next-package",
+                hasClosingTag = false,
+            )
+        }
+
+        return PackageFragment(
+            content = xml.substring(startIndex),
+            endReason = "eof",
+            hasClosingTag = false,
+        )
+    }
+
+    private fun tryParseChannelsFromFragment(fragment: PackageFragment): List<Map<String, Any?>>? {
+        val parser = android.util.Xml.newPullParser()
+        val wrappedXml = buildString {
+            append("<root>")
+            append(fragment.content)
+            if (!fragment.hasClosingTag) append("</package>")
+            append("</root>")
+        }
+
+        return try {
+            parser.setInput(java.io.StringReader(wrappedXml))
+            val channelsById = LinkedHashMap<String, Map<String, Any?>>()
+            var ev = parser.eventType
+            while (ev != org.xmlpull.v1.XmlPullParser.END_DOCUMENT) {
+                if (ev == org.xmlpull.v1.XmlPullParser.START_TAG && parser.name == "channel") {
+                    buildChannelMap(
+                        id = parser.getAttributeValue(null, "id"),
+                        name = parser.getAttributeValue(null, "name"),
+                        description = parser.getAttributeValue(null, "desc"),
+                        importance = parser.getAttributeValue(null, "importance"),
+                        importanceInt = parser.getAttributeValue(null, "importance-int"),
+                    )?.let { channel ->
+                        channelsById.putIfAbsent(channel["id"] as String, channel)
+                    }
                 }
                 ev = parser.next()
             }
+            channelsById.values.toList()
         } catch (e: Exception) {
-            Log.e(TAG, "parseTextXmlChannels: ${e.message}")
+            Log.d(TAG, "fallback fragment parser failed: ${e.message}")
+            null
         }
-        Log.d(TAG, "text XML: ${result.size} channels for $targetPkg")
-        return result
     }
 
+    private fun scanChannelsFromFragment(fragment: String): List<Map<String, Any?>> {
+        val channelsById = LinkedHashMap<String, Map<String, Any?>>()
+        var searchIndex = 0
+        while (searchIndex < fragment.length) {
+            val startIndex = findNextChannelTagStart(fragment, searchIndex)
+            if (startIndex < 0) break
+            val endIndex = findTagEnd(fragment, startIndex)
+            if (endIndex < 0) break
+
+            val tag = fragment.substring(startIndex, endIndex + 1)
+            val attrs = parseXmlAttributes(tag)
+            buildChannelMap(
+                id = attrs["id"],
+                name = attrs["name"],
+                description = attrs["desc"],
+                importance = attrs["importance"],
+                importanceInt = attrs["importance-int"],
+            )?.let { channel ->
+                channelsById.putIfAbsent(channel["id"] as String, channel)
+            }
+            searchIndex = endIndex + 1
+        }
+        return channelsById.values.toList()
+    }
+
+    private fun findNextChannelTagStart(text: String, fromIndex: Int): Int {
+        var searchIndex = fromIndex
+        while (searchIndex < text.length) {
+            val startIndex = text.indexOf("<channel", searchIndex)
+            if (startIndex < 0) return -1
+            val nextCharIndex = startIndex + "<channel".length
+            val nextChar = text.getOrNull(nextCharIndex)
+            if (nextChar == null || nextChar.isWhitespace() || nextChar == '>' || nextChar == '/') {
+                return startIndex
+            }
+            searchIndex = nextCharIndex
+        }
+        return -1
+    }
+
+    private fun findTagEnd(text: String, startIndex: Int): Int {
+        var quote: Char? = null
+        var index = startIndex
+        while (index < text.length) {
+            val ch = text[index]
+            if (quote == null) {
+                if (ch == '\'' || ch == '"') {
+                    quote = ch
+                } else if (ch == '>') {
+                    return index
+                }
+            } else if (ch == quote) {
+                quote = null
+            }
+            index += 1
+        }
+        return -1
+    }
+
+    private fun parseXmlAttributes(tag: String): Map<String, String> {
+        val attrs = linkedMapOf<String, String>()
+        val attrPattern = Regex("""([A-Za-z0-9_:-]+)\s*=\s*(["'])(.*?)\2""")
+        attrPattern.findAll(tag).forEach { match ->
+            attrs[match.groupValues[1]] = match.groupValues[3]
+        }
+        return attrs
+    }
+
+    private fun sanitizeInvalidXml(xml: String): String {
+        var removedEntityRefs = 0
+        val sanitizedEntities = Regex("""&#(x[0-9A-Fa-f]+|\d+);""").replace(xml) { match ->
+            val raw = match.groupValues[1]
+            val codePoint = if (raw.startsWith("x", ignoreCase = true)) {
+                raw.substring(1).toIntOrNull(16)
+            } else {
+                raw.toIntOrNull()
+            }
+            if (codePoint != null && !isValidXmlCodePoint(codePoint)) {
+                removedEntityRefs += 1
+                ""
+            } else {
+                match.value
+            }
+        }
+
+        var removedRawChars = 0
+        val sanitizedText = buildString(sanitizedEntities.length) {
+            sanitizedEntities.forEach { ch ->
+                if (isValidXmlChar(ch)) {
+                    append(ch)
+                } else {
+                    removedRawChars += 1
+                }
+            }
+        }
+
+        if (removedEntityRefs > 0 || removedRawChars > 0) {
+            Log.w(
+                TAG,
+                "sanitizeInvalidXml removed invalid content: entityRefs=$removedEntityRefs rawChars=$removedRawChars"
+            )
+        }
+        return sanitizedText
+    }
+
+    private fun isValidXmlCodePoint(codePoint: Int): Boolean {
+        return codePoint == 0x9 ||
+            codePoint == 0xA ||
+            codePoint == 0xD ||
+            codePoint in 0x20..0xD7FF ||
+            codePoint in 0xE000..0xFFFD ||
+            codePoint in 0x10000..0x10FFFF
+    }
+
+    private fun isValidXmlChar(ch: Char): Boolean {
+        return isValidXmlCodePoint(ch.code)
+    }
+
+    private fun buildChannelMap(
+        id: String?,
+        name: String?,
+        description: String?,
+        importance: String?,
+        importanceInt: String?,
+    ): Map<String, Any?>? {
+        val channelId = id?.takeIf { it.isNotEmpty() } ?: return null
+        return mapOf(
+            "id" to channelId,
+            "name" to (name ?: channelId),
+            "description" to (description ?: ""),
+            "importance" to ((importance ?: importanceInt)?.toIntOrNull() ?: 3),
+        )
+    }
+
+    private fun logChannelSource(pkg: String, source: String, count: Int) {
+        Log.d(TAG, "text XML result: targetPkg=$pkg source=$source count=$count")
+    }
 
     /** 返回已安装应用列表（排除自身），每项含 packageName / appName / icon / isSystem。
      *  includeSystem=false 时仅返回第三方应用。 */
