@@ -450,6 +450,7 @@ class _BatchChannelSettingsSheetState
                     showNotChange: !_isSingle,
                     items: [
                       DropdownMenuItem(value: kTriOptDefault, child: Text(l10n.optDefault)),
+                      DropdownMenuItem(value: kTriOptOn,      child: Text(l10n.optOn)),
                       DropdownMenuItem(value: kTriOptOff,     child: Text(l10n.optOff)),
                     ],
                     onChanged: (v) => setState(() => _focusNotif = v),
