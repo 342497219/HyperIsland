@@ -54,13 +54,17 @@ object DownloadIslandNotification {
                               (combined.contains("等待") || combined.contains("准备中") ||
                                combined.contains("队列") || combined.contains("pending", ignoreCase = true) ||
                                combined.contains("queued", ignoreCase = true))
+            val hasValidProgress = progress in 0..100
+            val safeProgress = progress.coerceIn(0, 100)
+            val shouldShowProgress = !isComplete && !isWaiting && !isPaused && hasValidProgress
 
             val mc = context.moduleContext()
             val displayTitle = when {
-                isComplete -> mc.getString(R.string.island_download_complete)
-                isPaused   -> mc.getString(R.string.island_download_paused)
-                isWaiting  -> mc.getString(R.string.island_download_waiting)
-                else       -> if (progress >= 0) mc.getString(R.string.island_downloading_progress, progress) else mc.getString(R.string.island_downloading)
+                isComplete        -> mc.getString(R.string.island_download_complete)
+                isPaused          -> mc.getString(R.string.island_download_paused)
+                isWaiting         -> mc.getString(R.string.island_download_waiting)
+                hasValidProgress  -> mc.getString(R.string.island_downloading_progress, safeProgress)
+                else              -> mc.getString(R.string.island_downloading)
             }
             val displayContent   = fileName.ifEmpty { text }
             val islandStateTitle = when {
@@ -107,15 +111,15 @@ object DownloadIslandNotification {
             builder.setIslandFirstFloat(false)
             builder.setEnableFloat(false)
 
-            // 小岛：下载中时带环形进度，其他状态仅图标
-            if (!isComplete && !isWaiting && !isPaused) {
-                builder.setSmallIslandCircularProgress("key_download_icon", progress)
+            // 小岛：仅在进度合法时显示环形进度，其他状态仅图标
+            if (shouldShowProgress) {
+                builder.setSmallIslandCircularProgress("key_download_icon", safeProgress)
             } else {
                 builder.setSmallIsland("key_download_icon")
             }
 
-            // 大岛：下载中时左侧状态+右侧环形进度，其他状态左侧状态+右侧文本
-            if (!isComplete && !isWaiting && !isPaused && progress > 0) {
+            // 大岛：仅在进度合法时显示右侧环形进度，否则退化为文本态
+            if (shouldShowProgress) {
                 builder.setBigIslandInfo(
                     left = ImageTextInfoLeft(
                         type     = 1,
@@ -123,7 +127,7 @@ object DownloadIslandNotification {
                         textInfo = TextInfo(title = islandStateTitle),
                     ),
                     progressText = ProgressTextInfo(
-                        progressInfo = CircularProgressInfo(progress = progress),
+                        progressInfo = CircularProgressInfo(progress = safeProgress),
                         textInfo     = TextInfo(title = fileName, narrowFont = true),
                     ),
                 )
@@ -168,10 +172,11 @@ object DownloadIslandNotification {
 
             // AOD 息屏显示 + updatable
             val aodTitle = when {
-                isComplete -> mc.getString(R.string.island_download_complete)
-                isPaused   -> mc.getString(R.string.island_aod_paused_progress, progress)
-                isWaiting  -> mc.getString(R.string.island_download_waiting)
-                else       -> if (progress >= 0) mc.getString(R.string.island_aod_downloading_progress, progress) else mc.getString(R.string.island_downloading)
+                isComplete       -> mc.getString(R.string.island_download_complete)
+                isPaused         -> mc.getString(R.string.island_download_paused)
+                isWaiting        -> mc.getString(R.string.island_download_waiting)
+                hasValidProgress -> mc.getString(R.string.island_aod_downloading_progress, safeProgress)
+                else             -> mc.getString(R.string.island_downloading)
             }
             // 修正 textButton 字段名 + 注入 aodTitle/updatable
             val wrapLongText = isWrapLongTextEnabled(context)
@@ -186,10 +191,11 @@ object DownloadIslandNotification {
             extras.putString("miui.focus.param", finalJson)
 
             val stateTag = when {
-                isComplete -> "done"
-                isPaused   -> "paused"
-                isWaiting  -> "waiting"
-                else       -> "${progress}%"
+                isComplete       -> "done"
+                isPaused         -> "paused"
+                isWaiting        -> "waiting"
+                hasValidProgress -> "${safeProgress}%"
+                else             -> "unknown"
             }
             XposedBridge.log("HyperIsland[Download]: Island injected — $fileName ($stateTag)")
 

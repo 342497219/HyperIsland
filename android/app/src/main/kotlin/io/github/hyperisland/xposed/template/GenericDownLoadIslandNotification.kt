@@ -139,6 +139,10 @@ object GenericProgressIslandNotification : IslandTemplate {
                 combined.contains("waiting",  ignoreCase = true)
             )
 
+            val hasValidProgress = progress in 0..100
+            val safeProgress = progress.coerceIn(0, 100)
+            val shouldShowProgress = !isComplete && !isWaiting && !isPaused && hasValidProgress
+
             val mc = context.moduleContext()
             val stateLabel = when {
                 isComplete -> mc.getString(R.string.island_state_complete)
@@ -192,15 +196,15 @@ object GenericProgressIslandNotification : IslandTemplate {
             builder.setShowNotification(showNotification)
             builder.setIslandConfig(timeout = timeoutSecs)
 
-            // 小岛：下载中时带环形进度，其他状态仅图标
-            if (!isComplete && progress > 0) {
-                builder.setSmallIslandCircularProgress("key_generic_progress_icon", progress)
+            // 小岛：仅在进度合法时带环形进度，其他状态仅图标
+            if (shouldShowProgress) {
+                builder.setSmallIslandCircularProgress("key_generic_progress_icon", safeProgress)
             } else {
                 builder.setSmallIsland("key_generic_progress_icon")
             }
 
-            // 大岛：下载中时左侧状态+右侧环形进度，其他状态左侧状态+右侧文本
-            if (!isComplete && !isWaiting && !isPaused && progress > 0) {
+            // 大岛：仅在进度合法时显示右侧环形进度，否则退化为文本态
+            if (shouldShowProgress) {
                 builder.setBigIslandInfo(
                     left = ImageTextInfoLeft(
                         type     = 1,
@@ -208,7 +212,7 @@ object GenericProgressIslandNotification : IslandTemplate {
                         textInfo = TextInfo(title = stateLabel),
                     ),
                     progressText = ProgressTextInfo(
-                        progressInfo = CircularProgressInfo(progress = progress),
+                        progressInfo = CircularProgressInfo(progress = safeProgress),
                         textInfo     = TextInfo(title = rightContent, narrowFont = true),
                     ),
                 )
@@ -254,10 +258,11 @@ object GenericProgressIslandNotification : IslandTemplate {
             extras.putString("miui.focus.param", jsonParam)
 
             val stateTag = when {
-                isComplete -> "done"
-                isPaused   -> "paused"
-                isWaiting  -> "waiting"
-                else       -> "${progress}%"
+                isComplete       -> "done"
+                isPaused         -> "paused"
+                isWaiting        -> "waiting"
+                hasValidProgress -> "${safeProgress}%"
+                else             -> "unknown"
             }
             XposedBridge.log("HyperIsland[Generic]: Island injected — $title ($stateTag) buttons=${actions.size}")
 
