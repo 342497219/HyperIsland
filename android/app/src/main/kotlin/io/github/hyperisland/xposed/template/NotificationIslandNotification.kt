@@ -69,23 +69,15 @@ object NotificationIslandNotification : IslandTemplate {
      */
     private fun injectViaDispatcher(context: Context, data: NotifData) {
         try {
-            val fallbackIcon = Icon.createWithResource(context, android.R.drawable.ic_dialog_info)
-            val displayIcon = when (data.iconMode) {
-                "notif_small" -> data.notifIcon ?: fallbackIcon
-                "notif_large" -> data.largeIcon ?: data.notifIcon ?: fallbackIcon
-                "app_icon"    -> data.appIconRaw ?: fallbackIcon
-                else          -> data.largeIcon ?: data.notifIcon ?: fallbackIcon  // auto
-            }.toRounded(context)
-
             val resolvedFirstFloat  = data.firstFloat      == "on"
             val resolvedEnableFloat = data.enableFloatMode == "on"
 
+            // 优化：不再传递图标，由 SystemUI 自动获取
             IslandDispatcher.post(
                 context,
                 IslandRequest(
                     title            = data.title,
                     content          = data.subtitle.ifEmpty { data.title },
-                    icon             = displayIcon,
                     timeoutSecs      = data.islandTimeout,
                     firstFloat       = resolvedFirstFloat,
                     enableFloat      = resolvedEnableFloat,
@@ -187,7 +179,6 @@ object NotificationIslandNotification : IslandTemplate {
             val effectiveActions = actions.take(2)
             if (effectiveActions.isNotEmpty()) {
                 val hyperActions = effectiveActions.mapIndexed { index, action ->
-                    // 文本模式（无图标），避免 TextButtonInfo.actionIcon 指向不存在的 pic 键
                     HyperAction(
                         key              = "action_notif_island_$index",
                         title            = action.title ?: "",
@@ -201,11 +192,8 @@ object NotificationIslandNotification : IslandTemplate {
 
             val resourceBundle = builder.buildResourceBundle()
             extras.putAll(resourceBundle)
-            // HyperOS 从 extras 顶层查找 action，将嵌套 bundle 展开
             flattenActionsToExtras(resourceBundle, extras)
-            // 修正 textButton 字段名：新库输出 "actionIntent"，HyperOS V3 协议只认 "action"
-            val wrapLongText = isWrapLongTextEnabled(context)
-            val jsonParam = fixTextButtonJson(builder.buildJsonParam(), wrapLongText)
+            val jsonParam = fixTextButtonJson(builder.buildJsonParam())
                 .let { if (!isOngoing) injectUpdatable(it, false) else it }
             extras.putString("miui.focus.param", jsonParam)
             if (showNotification) {
@@ -215,20 +203,11 @@ object NotificationIslandNotification : IslandTemplate {
                 extras.putBoolean("hyperisland_preserve_status_bar_small_icon", true)
                 FocusNotifStatusBarIconHook.markDirectProxyPosted(timeoutSecs)
             }
-            XposedBridge.log(
-                "HyperIsland[NotifIsland]: preserve marker written=$shouldPreserveStatusBarSmallIcon | title=$title | notifId=$notifId | showNotification=$showNotification"
-            )
-
-            XposedBridge.log(
-                "HyperIsland[NotifIsland]: Island injected — $title | left=$leftText | right=$rightContent | buttons=${actions.size} | isOngoing=${isOngoing}"
-            )
-
         } catch (e: Exception) {
             XposedBridge.log("HyperIsland[NotifIsland]: Island injection error: ${e.message}")
         }
     }
 
-    /** 将 param_v2.updatable 注入为指定值（库默认 true，不可一键清除）。*/
     private fun injectUpdatable(jsonParam: String, updatable: Boolean): String {
         return try {
             val json = org.json.JSONObject(jsonParam)
@@ -238,7 +217,7 @@ object NotificationIslandNotification : IslandTemplate {
         } catch (_: Exception) { jsonParam }
     }
 
-    private fun fixTextButtonJson(jsonParam: String, wrapLongText: Boolean = false): String {
+    private fun fixTextButtonJson(jsonParam: String): String {
         return try {
             val json = org.json.JSONObject(jsonParam)
             val pv2  = json.optJSONObject("param_v2") ?: return jsonParam
@@ -252,68 +231,22 @@ object NotificationIslandNotification : IslandTemplate {
                     btn.remove("actionIntentType")
                 }
             }
-
-            // 处理超长文本：将 iconTextInfo 转换为 coverInfo，使 content/subContent 上下两行显示
-            if (wrapLongText) {
-            val iconTextInfo = pv2.optJSONObject("iconTextInfo")
-            if (iconTextInfo != null) {
-                val content = iconTextInfo.optString("content", "")
-                if (content.isNotEmpty()) {
-                    var visualLen = 0
-                    var splitIdx = -1
-                    for (i in content.indices) {
-                        val c = content[i]
-                        visualLen += if (c.code > 255) 2 else 1
-                        if (visualLen >= 36 && splitIdx == -1) {
-                            splitIdx = i + 1
-                        }
-                    }
-                    if (splitIdx != -1 && splitIdx < content.length) {
-                        val subContent = content.substring(splitIdx)
-                        val isUseless = subContent.all { it == '.' || it == '…' || it.isWhitespace() }
-                        if (!isUseless) {
-                            // 使用 coverInfo 组件替代 iconTextInfo，coverInfo 的次要文本1/2 是上下两行
-                            val coverInfo = org.json.JSONObject()
-                            coverInfo.put("picCover", iconTextInfo.optString("animIconInfo_src", ""))
-                            // 从 animIconInfo 中提取图标 key 作为封面
-                            val animIcon = iconTextInfo.optJSONObject("animIconInfo")
-                            if (animIcon != null) {
-                                coverInfo.put("picCover", animIcon.optString("src", ""))
-                            }
-                            coverInfo.put("title", iconTextInfo.optString("title", ""))
-                            coverInfo.put("content", content.substring(0, splitIdx))
-                            coverInfo.put("subContent", subContent)
-                            pv2.remove("iconTextInfo")
-                            pv2.put("coverInfo", coverInfo)
-                        }
-                    }
-                }
-            }
-            } // wrapLongText
-
             json.toString()
         } catch (_: Exception) { jsonParam }
+    }
+
+    private fun flattenActionsToExtras(resourceBundle: Bundle, extras: Bundle) {
+        val nested = resourceBundle.getBundle("miui.focus.actions") ?: return
+        for (key in nested.keySet()) {
+            val action: Notification.Action? = if (Build.VERSION.SDK_INT >= 33) nested.getParcelable(key, Notification.Action::class.java) else @Suppress("DEPRECATION") nested.getParcelable(key)
+            if (action != null) extras.putParcelable(key, action)
+        }
     }
 
     private fun isWrapLongTextEnabled(context: Context): Boolean {
         return try {
             val uri = android.net.Uri.parse("content://io.github.hyperisland.settings/pref_wrap_long_text")
-            context.contentResolver.query(uri, null, null, null, null)
-                ?.use { if (it.moveToFirst()) it.getInt(0) != 0 else false } ?: false
-        } catch (_: Exception) {
-            false
-        }
-    }
-
-    /** 将 buildResourceBundle() 里嵌套的 "miui.focus.actions" 展开到 extras 顶层 */
-    private fun flattenActionsToExtras(resourceBundle: Bundle, extras: Bundle) {
-        val nested = resourceBundle.getBundle("miui.focus.actions") ?: return
-        for (key in nested.keySet()) {
-            val action: Notification.Action? = if (Build.VERSION.SDK_INT >= 33)
-                nested.getParcelable(key, Notification.Action::class.java)
-            else
-                @Suppress("DEPRECATION") nested.getParcelable(key)
-            if (action != null) extras.putParcelable(key, action)
-        }
+            context.contentResolver.query(uri, null, null, null, null)?.use { if (it.moveToFirst()) it.getInt(0) != 0 else false } ?: false
+        } catch (_: Exception) { false }
     }
 }

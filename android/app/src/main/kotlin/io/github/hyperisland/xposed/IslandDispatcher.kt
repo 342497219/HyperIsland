@@ -52,6 +52,8 @@ object IslandDispatcher {
     const val ACTION        = "io.github.hyperisland.ACTION_SHOW_ISLAND"
     /** 广播 Action，用于跨进程请求取消代理通知。*/
     const val ACTION_CANCEL = "io.github.hyperisland.ACTION_CANCEL_ISLAND"
+    /** 广播 Action，用于跨进程请求更新常驻岛状态。*/
+    const val ACTION_UPDATE_PERSISTENT = "io.github.hyperisland.ACTION_UPDATE_PERSISTENT"
     /** 取消广播携带的通知 ID extra 键。*/
     const val EXTRA_NOTIF_ID = "notif_id"
 
@@ -63,6 +65,8 @@ object IslandDispatcher {
 
     /** 默认通知 ID。固定 ID 保证同一时刻只有一条岛通知存在。*/
     const val NOTIF_ID = 0x48594944  // "HYID"
+    /** 常驻岛通知 ID。*/
+    const val PERSISTENT_NOTIF_ID = 0x48594945 // "HYIE"
 
     const val CHANNEL_ID            = "hyperisland_dispatcher"
     private const val CHANNEL_NAME = "HyperIsland 超级岛"
@@ -96,6 +100,14 @@ object IslandDispatcher {
                         XposedBridge.log("$TAG onReceive cancel error: ${e.message}")
                     }
                 }
+                ACTION_UPDATE_PERSISTENT -> {
+                    try {
+                        val enabled = intent.getBooleanExtra("enabled", false)
+                        updatePersistentIsland(appCtx, enabled)
+                    } catch (e: Exception) {
+                        XposedBridge.log("$TAG onReceive update persistent error: ${e.message}")
+                    }
+                }
             }
         }
     }
@@ -111,7 +123,15 @@ object IslandDispatcher {
         val appCtx = context.applicationContext ?: context
         createChannel(appCtx)
 
-        val filter = IntentFilter(ACTION).apply { addAction(ACTION_CANCEL) }
+        // 注册时检查是否需要开启常驻岛
+        if (isPersistentIslandEnabled(appCtx)) {
+            updatePersistentIsland(appCtx, true)
+        }
+
+        val filter = IntentFilter(ACTION).apply {
+            addAction(ACTION_CANCEL)
+            addAction(ACTION_UPDATE_PERSISTENT)
+        }
         if (Build.VERSION.SDK_INT >= 33) {
             appCtx.registerReceiver(receiver, filter, PERM, null, Context.RECEIVER_EXPORTED)
         } else {
@@ -200,9 +220,8 @@ object IslandDispatcher {
             notif.extras.putAll(resourceBundle)
             flattenActionsToExtras(resourceBundle, notif.extras)
 
-            val wrapLongText = isWrapLongTextEnabled(context)
             val jsonParam = islandBuilder.buildJsonParam()
-                .let { fixTextButtonJson(it, wrapLongText) }
+                .let { fixTextButtonJson(it) }
                 .let { injectIslandAppearance(it, request.highlightColor, request.dismissIsland) }
             notif.extras.putString("miui.focus.param", jsonParam)
             if (request.showNotification) {
@@ -266,6 +285,36 @@ object IslandDispatcher {
         }
     }
 
+    /**
+     * 更新常驻岛状态。
+     */
+    fun updatePersistentIsland(context: Context, enabled: Boolean) {
+        if (enabled) {
+            post(context, IslandRequest(
+                title = "HyperIsland",
+                content = "常驻岛已开启",
+                notifId = PERSISTENT_NOTIF_ID,
+                timeoutSecs = 0x7FFFFFFF, // 极大值，接近永久
+                isOngoing = true,
+                showNotification = false, // 不在通知栏显示普通通知，仅显示岛
+                firstFloat = false,
+                enableFloat = false
+            ))
+        } else {
+            cancel(context, PERSISTENT_NOTIF_ID)
+        }
+    }
+
+    private fun isPersistentIslandEnabled(context: Context): Boolean {
+        return try {
+            val uri = android.net.Uri.parse("content://io.github.hyperisland.settings/pref_persistent_island")
+            context.contentResolver.query(uri, null, null, null, null)
+                ?.use { if (it.moveToFirst()) it.getInt(0) != 0 else false } ?: false
+        } catch (_: Exception) {
+            false
+        }
+    }
+
     // ── 内部工具 ──────────────────────────────────────────────────────────────
 
     /**
@@ -308,7 +357,7 @@ object IslandDispatcher {
     }
 
     /** 修正新库输出的 textButton JSON，将 "actionIntent" 字段替换为协议所需的 "action"。*/
-    private fun fixTextButtonJson(jsonParam: String, wrapLongText: Boolean = false): String {
+    private fun fixTextButtonJson(jsonParam: String): String {
         return try {
             val json = org.json.JSONObject(jsonParam)
             val pv2  = json.optJSONObject("param_v2") ?: return jsonParam
@@ -323,53 +372,8 @@ object IslandDispatcher {
                 }
             }
 
-            // 处理超长文本：将 iconTextInfo 转换为 coverInfo，使 content/subContent 上下两行显示
-            if (wrapLongText) {
-            val iconTextInfo = pv2.optJSONObject("iconTextInfo")
-            if (iconTextInfo != null) {
-                val content = iconTextInfo.optString("content", "")
-                if (content.isNotEmpty()) {
-                    var visualLen = 0
-                    var splitIdx = -1
-                    for (i in content.indices) {
-                        val c = content[i]
-                        visualLen += if (c.code > 255) 2 else 1
-                        if (visualLen >= 36 && splitIdx == -1) {
-                            splitIdx = i + 1
-                        }
-                    }
-                    if (splitIdx != -1 && splitIdx < content.length) {
-                        val subContent = content.substring(splitIdx)
-                        val isUseless = subContent.all { it == '.' || it == '…' || it.isWhitespace() }
-                        if (!isUseless) {
-                            val coverInfo = org.json.JSONObject()
-                            val animIcon = iconTextInfo.optJSONObject("animIconInfo")
-                            if (animIcon != null) {
-                                coverInfo.put("picCover", animIcon.optString("src", ""))
-                            }
-                            coverInfo.put("title", iconTextInfo.optString("title", ""))
-                            coverInfo.put("content", content.substring(0, splitIdx))
-                            coverInfo.put("subContent", subContent)
-                            pv2.remove("iconTextInfo")
-                            pv2.put("coverInfo", coverInfo)
-                        }
-                    }
-                }
-            }
-            } // wrapLongText
-
             json.toString()
         } catch (_: Exception) { jsonParam }
-    }
-
-    private fun isWrapLongTextEnabled(context: Context): Boolean {
-        return try {
-            val uri = android.net.Uri.parse("content://io.github.hyperisland.settings/pref_wrap_long_text")
-            context.contentResolver.query(uri, null, null, null, null)
-                ?.use { if (it.moveToFirst()) it.getInt(0) != 0 else false } ?: false
-        } catch (_: Exception) {
-            false
-        }
     }
 
     /** 将 buildResourceBundle() 里嵌套的 "miui.focus.actions" 展开到 extras 顶层。*/

@@ -1,6 +1,7 @@
 package io.github.hyperisland.xposed.templates
 
 import android.app.Notification
+import android.os.Build
 import android.content.Context
 import android.graphics.drawable.Icon
 import android.os.Bundle
@@ -243,15 +244,12 @@ object AINotificationIslandNotification : IslandTemplate {
         rightText: String,
     ) {
         try {
-            val fallbackIcon = Icon.createWithResource(context, android.R.drawable.ic_dialog_info)
-            val displayIcon  = resolveIcon(data, data.iconMode, fallbackIcon).toRounded(context)
-
+            // 优化：不再传递图标，由 SystemUI 自动获取
             IslandDispatcher.post(
                 context,
                 IslandRequest(
                     title            = leftText,
                     content          = rightText,
-                    icon             = displayIcon,
                     timeoutSecs      = data.islandTimeout,
                     firstFloat       = data.firstFloat == "on",
                     enableFloat      = data.enableFloatMode == "on",
@@ -289,25 +287,37 @@ object AINotificationIslandNotification : IslandTemplate {
         isOngoing: Boolean,
     ) {
         try {
-            val fallbackIcon     = Icon.createWithResource(context, android.R.drawable.ic_dialog_info)
-            val data             = _IconData(notifIcon, largeIcon, appIconRaw)
-            val displayIcon      = resolveIcon(data, iconMode,      fallbackIcon).toRounded(context)
-            val focusDisplayIcon = resolveIcon(data, focusIconMode, fallbackIcon).toRounded(context)
+            val fallbackIcon = Icon.createWithResource(context, android.R.drawable.ic_dialog_info)
+            // 超级岛区域图标（bigIslandArea / smallIslandArea）
+            val displayIcon = when (iconMode) {
+                "notif_small" -> notifIcon ?: fallbackIcon
+                "notif_large" -> largeIcon ?: notifIcon ?: fallbackIcon
+                "app_icon"    -> appIconRaw ?: fallbackIcon
+                else          -> largeIcon ?: notifIcon ?: fallbackIcon  // auto
+            }.toRounded(context)
+            // 焦点图标（iconTextInfo）
+            val focusDisplayIcon = when (focusIconMode) {
+                "notif_small" -> notifIcon ?: appIconRaw ?: fallbackIcon
+                "notif_large" -> largeIcon ?: appIconRaw ?: notifIcon ?: fallbackIcon
+                "app_icon"    -> appIconRaw ?: fallbackIcon
+                else          -> largeIcon ?: appIconRaw ?: notifIcon ?: fallbackIcon  // auto
+            }.toRounded(context)
 
             val resolvedFirstFloat  = firstFloat      == "on"
             val resolvedEnableFloat = enableFloatMode == "on"
             val showNotification    = focusNotif != "off"
-            val shouldPreserveIcon  = showNotification && preserveStatusBarSmallIcon != "off"
+            val shouldPreserveStatusBarSmallIcon =
+                showNotification && preserveStatusBarSmallIcon != "off"
 
-            val builder = HyperIslandNotification.Builder(context, "notif_island", title)
+            val builder = HyperIslandNotification.Builder(context, "ai_notif_island", title)
 
-            builder.addPicture(HyperPicture("key_ai_island_icon",    displayIcon))
+            builder.addPicture(HyperPicture("key_ai_island_icon", displayIcon))
             builder.addPicture(HyperPicture("key_ai_focus_icon", focusDisplayIcon))
 
             builder.setIconTextInfo(
                 picKey  = "key_ai_focus_icon",
-                title   = title,
-                content = subtitle.ifEmpty { title },
+                title   = leftText,
+                content = rightText,
             )
 
             builder.setIslandFirstFloat(resolvedFirstFloat)
@@ -346,57 +356,33 @@ object AINotificationIslandNotification : IslandTemplate {
             val resourceBundle = builder.buildResourceBundle()
             extras.putAll(resourceBundle)
             flattenActionsToExtras(resourceBundle, extras)
-
-            val wrapLongText = isWrapLongTextEnabled(context)
-            val jsonParam = fixTextButtonJson(builder.buildJsonParam(), wrapLongText)
+            val jsonParam = fixTextButtonJson(builder.buildJsonParam())
                 .let { if (!isOngoing) injectUpdatable(it, false) else it }
-
             extras.putString("miui.focus.param", jsonParam)
-            if (showNotification) extras.putBoolean("hyperisland_focus_proxy", true)
-            if (shouldPreserveIcon) {
+            if (showNotification) {
+                extras.putBoolean("hyperisland_focus_proxy", true)
+            }
+            if (shouldPreserveStatusBarSmallIcon) {
                 extras.putBoolean("hyperisland_preserve_status_bar_small_icon", true)
                 FocusNotifStatusBarIconHook.markDirectProxyPosted(timeoutSecs)
             }
-
-            XposedBridge.log(
-                "HyperIsland[AINotifIsland]: Injected — title=$title | left=$leftText | right=$rightText | notifId=$notifId"
-            )
         } catch (e: Exception) {
-            XposedBridge.log("HyperIsland[AINotifIsland]: Injection error: ${e.message}")
+            XposedBridge.log("HyperIsland[AINotifIsland]: Island injection error: ${e.message}")
         }
     }
 
-    // ── 图标解析辅助 ───────────────────────────────────────────────────────────
-
-    private data class _IconData(
-        val notifIcon: Icon?,
-        val largeIcon: Icon?,
-        val appIconRaw: Icon?,
-    )
-
-    private fun resolveIcon(data: NotifData, mode: String?, fallback: Icon): Icon =
-        resolveIcon(_IconData(data.notifIcon, data.largeIcon, data.appIconRaw), mode, fallback)
-
-    private fun resolveIcon(data: _IconData, mode: String?, fallback: Icon): Icon =
-        when (mode) {
-            "notif_small" -> data.notifIcon ?: fallback
-            "notif_large" -> data.largeIcon ?: data.notifIcon ?: fallback
-            "app_icon"    -> data.appIconRaw ?: fallback
-            else          -> data.largeIcon ?: data.notifIcon ?: fallback
-        }
-
-    // ── JSON / 通知工具（与 NotificationIslandNotification 保持一致） ──────────
-
-    private fun injectUpdatable(jsonParam: String, updatable: Boolean): String =
-        try {
-            val json = JSONObject(jsonParam)
-            json.optJSONObject("param_v2")?.put("updatable", updatable)
+    private fun injectUpdatable(jsonParam: String, updatable: Boolean): String {
+        return try {
+            val json = org.json.JSONObject(jsonParam)
+            val pv2  = json.optJSONObject("param_v2") ?: return jsonParam
+            pv2.put("updatable", updatable)
             json.toString()
         } catch (_: Exception) { jsonParam }
+    }
 
-    private fun fixTextButtonJson(jsonParam: String, wrapLongText: Boolean = false): String =
-        try {
-            val json = JSONObject(jsonParam)
+    private fun fixTextButtonJson(jsonParam: String): String {
+        return try {
+            val json = org.json.JSONObject(jsonParam)
             val pv2  = json.optJSONObject("param_v2") ?: return jsonParam
             val btns = pv2.optJSONArray("textButton")
             if (btns != null) {
@@ -408,52 +394,24 @@ object AINotificationIslandNotification : IslandTemplate {
                     btn.remove("actionIntentType")
                 }
             }
-            if (wrapLongText) {
-                val iconTextInfo = pv2.optJSONObject("iconTextInfo")
-                if (iconTextInfo != null) {
-                    val content = iconTextInfo.optString("content", "")
-                    if (content.isNotEmpty()) {
-                        var visualLen = 0
-                        var splitIdx  = -1
-                        for (i in content.indices) {
-                            visualLen += if (content[i].code > 255) 2 else 1
-                            if (visualLen >= 36 && splitIdx == -1) splitIdx = i + 1
-                        }
-                        if (splitIdx != -1 && splitIdx < content.length) {
-                            val subContent = content.substring(splitIdx)
-                            val isUseless  = subContent.all { it == '.' || it == '…' || it.isWhitespace() }
-                            if (!isUseless) {
-                                val coverInfo = JSONObject()
-                                val animIcon  = iconTextInfo.optJSONObject("animIconInfo")
-                                coverInfo.put("picCover", animIcon?.optString("src", "") ?: "")
-                                coverInfo.put("title",      iconTextInfo.optString("title", ""))
-                                coverInfo.put("content",    content.substring(0, splitIdx))
-                                coverInfo.put("subContent", subContent)
-                                pv2.remove("iconTextInfo")
-                                pv2.put("coverInfo", coverInfo)
-                            }
-                        }
-                    }
-                }
-            }
             json.toString()
         } catch (_: Exception) { jsonParam }
-
-    private fun isWrapLongTextEnabled(context: Context): Boolean =
-        try {
-            val uri = android.net.Uri.parse("content://io.github.hyperisland.settings/pref_wrap_long_text")
-            context.contentResolver.query(uri, null, null, null, null)
-                ?.use { if (it.moveToFirst()) it.getInt(0) != 0 else false } ?: false
-        } catch (_: Exception) { false }
+    }
 
     private fun flattenActionsToExtras(resourceBundle: Bundle, extras: Bundle) {
         val nested = resourceBundle.getBundle("miui.focus.actions") ?: return
         for (key in nested.keySet()) {
-            val action: Notification.Action? = if (android.os.Build.VERSION.SDK_INT >= 33)
-                nested.getParcelable(key, Notification.Action::class.java)
-            else
-                @Suppress("DEPRECATION") nested.getParcelable(key)
+            val action: Notification.Action? = if (Build.VERSION.SDK_INT >= 33) nested.getParcelable(key, Notification.Action::class.java) else @Suppress("DEPRECATION") nested.getParcelable(key)
             if (action != null) extras.putParcelable(key, action)
+        }
+    }
+
+    private fun resolveIcon(data: NotifData, mode: String?, fallback: Icon): Icon {
+        return when (mode) {
+            "notif_small" -> data.notifIcon ?: fallback
+            "notif_large" -> data.largeIcon ?: data.notifIcon ?: fallback
+            "app_icon"    -> data.appIconRaw ?: fallback
+            else          -> data.largeIcon ?: data.notifIcon ?: fallback
         }
     }
 }

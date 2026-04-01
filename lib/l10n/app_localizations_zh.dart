@@ -617,4 +617,55 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get templateAiNotificationIslandName => 'AI 通知超级岛';
+
+  @override
+  String get resumeNotificationTitle => '恢复通知';
+
+  @override
+  String get resumeNotificationSubtitle => '重启应用后尝试恢复之前的通知';
+
+  @override
+  String get useHookAppIconTitle => '使用 Hook 应用图标';
+
+  @override
+  String get useHookAppIconSubtitle => '尝试从 Hook 的应用中获取图标';
+
+  @override
+  String get defaultFirstFloatTitle => '默认初次展开';
+
+  @override
+  String get defaultFirstFloatSubtitle => '新渠道默认开启初次收到通知时展开';
+
+  @override
+  String get defaultEnableFloatTitle => '默认更新展开';
+
+  @override
+  String get defaultEnableFloatSubtitle => '新渠道默认开启通知更新时展开';
+
+  @override
+  String get defaultMarqueeTitle => '默认消息滚动';
+
+  @override
+  String get defaultMarqueeSubtitle => '新渠道默认开启消息滚动';
+
+  @override
+  String get defaultFocusNotifTitle => '默认焦点通知';
+
+  @override
+  String get defaultFocusNotifSubtitle => '新渠道默认开启焦点通知替换';
+
+  @override
+  String get defaultPreserveSmallIconTitle => '默认保留小图标';
+
+  @override
+  String get defaultPreserveSmallIconSubtitle => '新渠道默认开启保留状态栏小图标';
+
+  @override
+  String get additionalSettingsSection => '更多设置';
+
+  @override
+  String get checkUpdateTitle => '检查更新';
+
+  @override
+  String get configIOSection => '配置导入导出';
 }

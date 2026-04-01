@@ -328,5 +328,23 @@
   "aiConfigSaveButton": "保存",
   "aiConfigSaved": "AI 配置已保存",
   "aiConfigTips": "AI 将收到通知的应用包名、标题和正文，返回左侧（来源）和右侧（内容）短文本。支持兼容 OpenAI 格式的接口（如 DeepSeek、Claude 等）。超过 3 秒未响应时自动回退到默认逻辑。",
-  "templateAiNotificationIslandName": "AI 通知超级岛"
+  "templateAiNotificationIslandName": "AI 通知超级岛",
+
+  "resumeNotificationTitle": "恢复通知",
+  "resumeNotificationSubtitle": "重启应用后尝试恢复之前的通知",
+  "useHookAppIconTitle": "使用 Hook 应用图标",
+  "useHookAppIconSubtitle": "尝试从 Hook 的应用中获取图标",
+  "defaultFirstFloatTitle": "默认初次展开",
+  "defaultFirstFloatSubtitle": "新渠道默认开启初次收到通知时展开",
+  "defaultEnableFloatTitle": "默认更新展开",
+  "defaultEnableFloatSubtitle": "新渠道默认开启通知更新时展开",
+  "defaultMarqueeTitle": "默认消息滚动",
+  "defaultMarqueeSubtitle": "新渠道默认开启消息滚动",
+  "defaultFocusNotifTitle": "默认焦点通知",
+  "defaultFocusNotifSubtitle": "新渠道默认开启焦点通知替换",
+  "defaultPreserveSmallIconTitle": "默认保留小图标",
+  "defaultPreserveSmallIconSubtitle": "新渠道默认开启保留状态栏小图标",
+  "additionalSettingsSection": "更多设置",
+  "checkUpdateTitle": "检查更新",
+  "configIOSection": "配置导入导出"
 }

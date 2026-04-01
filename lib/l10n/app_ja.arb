@@ -40,7 +40,7 @@
   "restartFailed": "再起動に失敗しました: {message}",
   "restartRootRequired": "このアプリに root 権限が付与されているか確認してください",
   "note1": "1. このページは Dynamic Island の対応をテストするためのものであり、実際の効果を示すものではありません。",
-  "note2": "2. HyperCeiler でシステム UI と MIUI フレームワークのフォーカス通知のホワイトリストを無効化してください。",
+  "note2": "2. HyperCeiler でシステム UI と MIUI フレームワークのフォーカス通知のホワイトリストを无効化してください。",
   "note3": "3. LSPosed Manager で有効化後に関連するスコープアプリを再起動する必要があります。",
   "note4": "4. 一般的なアダプティブ表示に対応しています。適切なテンプレートを確認してみてください。",
 
@@ -131,7 +131,7 @@
   "allChannelsActive": "{count} 個のチャンネルですべて有効",
   "selectedChannels": "{selected} / {total} 個のチャンネルを選択済み",
   "allChannelsDisabled": "すべての {count} 個のチャンネル (無効化済み)",
-  "appDisabledBanner": "アプリが無効化されているため、以下のチャンネル設定は無効です",
+  "appDisabledBanner": "アプリが無効化されているため、以下のチャンネル設定は无効です",
   "channelImportance": "重要度: {importance}  ·  {id}",
   "channelSettings": "チャンネルの設定",
   "importanceNone": "なし",
@@ -141,7 +141,7 @@
   "importanceHigh": "高",
   "importanceUnknown": "不明",
   "applyToEnabledChannels": "有効な {count} 個のチャンネルに適用されます",
-  "applyToAllChannels": "すべての {count} 個のチャンネルに適用されます",
+  "applyToAllChannels": "すべての {count} 個的频道に適用されます",
 
   "templateDownloadName": "ダウンロード",
   "templateNotificationIslandName": "Notification Island",
@@ -188,7 +188,7 @@
     }
   },
   "blacklistedAppsCount": "{count} 個のアプリのフォーカス通知をブロックしました",
-  "blacklistedAppsCountWithSystem": "{count} 個のアプリのフォーカス通知をブロックしました (システムアプリを含む)"
+  "blacklistedAppsCountWithSystem": "{count} 個のアプリのフォーカス通知をブロックしました (システムアプリを含む)",
 
   "firstFloatLabelSubtitle": "Island が初めて通知を受信時にフォーカス通知として展開します",
   "updateFloatLabelSubtitle": "Island の更新時にフロート通知を展開します",
@@ -199,7 +199,7 @@
   "aiConfigSection": "AI エンハンスメント",
   "aiConfigTitle": "AI 通知の概要",
   "aiConfigSubtitleEnabled": "有効 · タップで AI パラメータを構成",
-  "aiConfigSubtitleDisabled": "無効 · タップで構成",
+  "aiConfigSubtitleDisabled": "无効 · タップで構成",
   "aiEnabledTitle": "AI の概要を有効化",
   "aiEnabledSubtitle": "AI が Island の左右のテキストを生成します。タイムアウトまたはエラーの発生時はフォールバックします。",
   "aiApiSection": "API パラメータ",

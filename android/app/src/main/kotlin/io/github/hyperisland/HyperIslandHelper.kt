@@ -20,14 +20,12 @@ object HyperIslandHelper {
         content: String,
     ) {
         try {
-            // 取应用自身图标（Icon.createWithBitmap，跨进程安全）
-            val icon = context.packageManager.getAppIcon(context.packageName)
+            // 优化：不再从应用侧传递图标，由 SystemUI 进程自动获取，解决 Binder 溢出问题
             IslandDispatcher.sendBroadcast(
                 context,
                 IslandRequest(
                     title   = title,
                     content = content,
-                    icon    = icon,
                 )
             )
             Log.d(TAG, "Island request sent: $title | $content")

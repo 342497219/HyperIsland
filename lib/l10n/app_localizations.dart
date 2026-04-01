@@ -1215,6 +1215,108 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'AI 通知超级岛'**
   String get templateAiNotificationIslandName;
+
+  /// No description provided for @resumeNotificationTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'恢复通知'**
+  String get resumeNotificationTitle;
+
+  /// No description provided for @resumeNotificationSubtitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'重启应用后尝试恢复之前的通知'**
+  String get resumeNotificationSubtitle;
+
+  /// No description provided for @useHookAppIconTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'使用 Hook 应用图标'**
+  String get useHookAppIconTitle;
+
+  /// No description provided for @useHookAppIconSubtitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'尝试从 Hook 的应用中获取图标'**
+  String get useHookAppIconSubtitle;
+
+  /// No description provided for @defaultFirstFloatTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'默认初次展开'**
+  String get defaultFirstFloatTitle;
+
+  /// No description provided for @defaultFirstFloatSubtitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'新渠道默认开启初次收到通知时展开'**
+  String get defaultFirstFloatSubtitle;
+
+  /// No description provided for @defaultEnableFloatTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'默认更新展开'**
+  String get defaultEnableFloatTitle;
+
+  /// No description provided for @defaultEnableFloatSubtitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'新渠道默认开启通知更新时展开'**
+  String get defaultEnableFloatSubtitle;
+
+  /// No description provided for @defaultMarqueeTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'默认消息滚动'**
+  String get defaultMarqueeTitle;
+
+  /// No description provided for @defaultMarqueeSubtitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'新渠道默认开启消息滚动'**
+  String get defaultMarqueeSubtitle;
+
+  /// No description provided for @defaultFocusNotifTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'默认焦点通知'**
+  String get defaultFocusNotifTitle;
+
+  /// No description provided for @defaultFocusNotifSubtitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'新渠道默认开启焦点通知替换'**
+  String get defaultFocusNotifSubtitle;
+
+  /// No description provided for @defaultPreserveSmallIconTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'默认保留小图标'**
+  String get defaultPreserveSmallIconTitle;
+
+  /// No description provided for @defaultPreserveSmallIconSubtitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'新渠道默认开启保留状态栏小图标'**
+  String get defaultPreserveSmallIconSubtitle;
+
+  /// No description provided for @additionalSettingsSection.
+  ///
+  /// In zh, this message translates to:
+  /// **'更多设置'**
+  String get additionalSettingsSection;
+
+  /// No description provided for @checkUpdateTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'检查更新'**
+  String get checkUpdateTitle;
+
+  /// No description provided for @configIOSection.
+  ///
+  /// In zh, this message translates to:
+  /// **'配置导入导出'**
+  String get configIOSection;
 }
 
 class _AppLocalizationsDelegate

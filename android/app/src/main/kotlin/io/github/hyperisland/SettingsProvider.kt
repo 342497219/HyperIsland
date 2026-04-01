@@ -59,7 +59,8 @@ class SettingsProvider : ContentProvider() {
             segment.startsWith("pref_channel_first_float_") ||
             segment.startsWith("pref_channel_enable_float_") ||
             segment.startsWith("pref_channel_timeout_") ||
-            segment.startsWith("pref_channel_marquee_")) {
+            segment.startsWith("pref_channel_marquee_") ||
+            segment.startsWith("pref_channel_renderer_")) {
             cursor.newRow().add(prefs.getString(flutterKey, "") ?: "")
             return cursor
         }
@@ -82,13 +83,13 @@ class SettingsProvider : ContentProvider() {
         } else {
             // 以下 key 默认关闭（0）；其余 key 默认开启（1）
             if (segment == "pref_marquee_feature" ||
-                segment == "pref_wrap_long_text" ||
                 segment == "pref_unlock_all_focus" ||
                 segment == "pref_unlock_focus_auth" ||
                 segment == "pref_default_first_float" ||
                 segment == "pref_default_enable_float" ||
                 segment == "pref_default_marquee" ||
                 segment == "pref_default_preserve_small_icon" ||
+                segment == "pref_persistent_island" ||
                 segment == "pref_ai_enabled") 0 else 1
         }
         cursor.newRow().add(value)

@@ -135,6 +135,15 @@ class MainActivity : FlutterActivity() {
                     result.success(version)
                 }
 
+                "updatePersistentIsland" -> {
+                    val enabled = call.argument<Boolean>("enabled") ?: false
+                    val intent = android.content.Intent(io.github.hyperisland.xposed.IslandDispatcher.ACTION_UPDATE_PERSISTENT).apply {
+                        putExtra("enabled", enabled)
+                    }
+                    sendBroadcast(intent)
+                    result.success(true)
+                }
+
                 else -> {
                     result.notImplemented()
                 }
@@ -149,7 +158,7 @@ class MainActivity : FlutterActivity() {
      * 获取指定包的通知渠道列表。
      *
      * 通知渠道持久化在 /data/system/notification_policy.xml，
-     * 用 root 读取后用 XmlPullParser 解析，无需调用任何受限 API。
+     * 用 root 直接读取 ABX 原始数据后在应用内解码为文本 XML，再交给 XmlPullParser 解析。
      */
     private fun getNotificationChannelsForPackage(pkg: String): List<Map<String, Any?>>? {
         if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.O) return emptyList()
@@ -160,7 +169,7 @@ class MainActivity : FlutterActivity() {
         val xml = try {
             convertAbxPolicyToXml()
         } catch (e: Exception) {
-            Log.e(TAG, "convertAbxPolicyToXml failed for $pkg: ${e.message}")
+            Log.e(TAG, "convertAbxPolicyToXml failed for $pkg: ${e.message}", e)
             return null
         }
         if (xml.isEmpty()) {
@@ -168,12 +177,10 @@ class MainActivity : FlutterActivity() {
             return null
         }
 
-        val containsTarget = xml.contains(pkg)
-        val targetIndex = xml.indexOf(pkg)
         val sanitizedXml = sanitizeInvalidXml(xml)
         Log.d(
             TAG,
-            "policy xml: ${xml.length} chars, sanitized=${sanitizedXml.length} chars, targetPkg=$pkg, containsTarget=$containsTarget, targetIndex=$targetIndex"
+            "policy xml: ${xml.length} chars, sanitized=${sanitizedXml.length} chars, targetPkg=$pkg"
         )
 
         return try {
@@ -195,8 +202,8 @@ class MainActivity : FlutterActivity() {
                 }
             }
 
-            if (strictResult == null || (!strictResult.completedTargetPackage && containsTarget)) {
-                Log.d(TAG, "fallback parse start: targetPkg=$pkg reason=${if (strictResult == null) "strict-error" else "strict-miss"}")
+            if (strictResult == null) {
+                Log.d(TAG, "fallback parse start: targetPkg=$pkg reason=strict-error")
                 val fallbackResult = parseTextXmlChannelsFallback(sanitizedXml, pkg)
                 if (fallbackResult != null) {
                     logChannelSource(pkg, fallbackResult.source, fallbackResult.channels.size)
@@ -214,34 +221,74 @@ class MainActivity : FlutterActivity() {
     }
 
     /**
-     * 调用系统内置 abx2xml 命令将 notification_policy.xml（ABX 二进制格式）转换为文本 XML。
-     * abx2xml 在 Android 12+ 设备上由系统提供（/system/bin/abx2xml）。
+     * 将 notification_policy.xml（ABX 二进制格式）转换为文本 XML。
+     *
+     * 保持原有“拿到文本 XML 再解析”的调用边界，但底层不再依赖系统 abx2xml，
+     * 而是直接读取源文件字节并交给 [AbxXmlDecoder] 处理。
      */
     private fun convertAbxPolicyToXml(): String {
-        val input = "/data/system/notification_policy.xml"
-        val tmp   = "/data/local/tmp/.hyp_policy.xml"
+        cleanupLegacyPolicyTempFiles()
 
-        // 依次尝试几种调用姿势，兼容不同 ROM 和 Android 版本
-        val cmds = listOf(
-            "abx2xml $input /dev/stdout 2>/dev/null",
-            "abx2xml $input - 2>/dev/null",
-            "abx2xml $input $tmp 2>/dev/null && cat $tmp; rm -f $tmp",
-        )
-
-        for (cmd in cmds) {
-            try {
-                val proc = Runtime.getRuntime().exec(arrayOf("su", "-c", cmd))
-                val out  = proc.inputStream.bufferedReader().readText()
-                proc.waitFor()
-                if (out.length > 50 && out.contains('<')) {
-                    Log.d(TAG, "abx2xml ok: ${out.length} chars")
-                    return out
-                }
-            } catch (e: Exception) {
-                Log.d(TAG, "abx2xml attempt failed: ${e.message}")
-            }
+        val policyBytes = try {
+            readNotificationPolicyBytes()
+        } catch (e: Exception) {
+            Log.e(TAG, "readNotificationPolicyBytes failed: ${e.message}", e)
+            cleanupLegacyPolicyTempFiles()
+            return ""
         }
-        return ""
+
+        if (policyBytes.isEmpty()) {
+            cleanupLegacyPolicyTempFiles()
+            return ""
+        }
+
+        return try {
+            val xml = AbxXmlDecoder.decode(policyBytes)
+            Log.d(TAG, "local abx2xml ok: abx=${policyBytes.size} bytes, xml=${xml.length} chars")
+            xml
+        } catch (e: Exception) {
+            Log.e(TAG, "AbxXmlDecoder failed: ${e.message}", e)
+            ""
+        } finally {
+            cleanupLegacyPolicyTempFiles()
+        }
+    }
+
+    /** 直接从系统 notification_policy.xml 读取 ABX 原始字节。 */
+    private fun readNotificationPolicyBytes(): ByteArray {
+        val input = "/data/system/notification_policy.xml"
+        val result = RootShell.run("cat $input")
+        if (result.exitCode != 0) {
+            Log.d(
+                TAG,
+                "notification_policy read failed: exit=${result.exitCode}, bytes=${result.stdout.size}, stderr=${result.stderr.take(120)}"
+            )
+            return byteArrayOf()
+        }
+
+        if (!AbxXmlDecoder.isAbx(result.stdout)) {
+            Log.d(TAG, "notification_policy read failed: expected ABX, got ${result.stdout.size} bytes")
+            return byteArrayOf()
+        }
+
+        Log.d(TAG, "notification_policy read ok: ${result.stdout.size} bytes")
+        return result.stdout
+    }
+
+    /** 清理旧方案遗留的临时 policy 快照文件。 */
+    private fun cleanupLegacyPolicyTempFiles() {
+        val tempFiles = listOf(
+            "/data/local/tmp/.hyp_policy.xml",
+            "/data/local/tmp/.hyp_policy_snapshot.abx",
+        )
+        try {
+            val result = RootShell.run("rm -f ${tempFiles.joinToString(separator = " ")} 2>/dev/null")
+            if (result.exitCode != 0) {
+                Log.d(TAG, "policy temp cleanup failed: exit=${result.exitCode}, stderr=${result.stderr.take(120)}")
+            }
+        } catch (e: Exception) {
+            Log.d(TAG, "policy temp cleanup failed: ${e.message}")
+        }
     }
 
     /** 文本 XML 严格解析。命中目标 package 后在该 package 结束时立即返回。 */
@@ -314,16 +361,9 @@ class MainActivity : FlutterActivity() {
         )
 
         val fragmentChannels = tryParseChannelsFromFragment(fragment)
-        if (fragmentChannels != null) {
-            Log.d(TAG, "fallback fragment parser result: targetPkg=$targetPkg count=${fragmentChannels.size}")
-            if (fragmentChannels.isNotEmpty() || !fragment.content.contains("<channel")) {
-                return FallbackParseResult(fragmentChannels, "fallback-fragment")
-            }
-        }
-
-        val scannedChannels = scanChannelsFromFragment(fragment.content)
-        Log.d(TAG, "fallback channel scan result: targetPkg=$targetPkg count=${scannedChannels.size}")
-        return FallbackParseResult(scannedChannels, "fallback-scan")
+        if (fragmentChannels == null) return null
+        Log.d(TAG, "fallback fragment parser result: targetPkg=$targetPkg count=${fragmentChannels.size}")
+        return FallbackParseResult(fragmentChannels, "fallback-fragment")
     }
 
     private fun extractTargetPackageFragment(xml: String, targetPkg: String): PackageFragment? {
@@ -332,6 +372,14 @@ class MainActivity : FlutterActivity() {
         )
         val startMatch = pattern.find(xml) ?: return null
         val startIndex = startMatch.range.first
+        if (startMatch.value.trimEnd().endsWith("/>")) {
+            return PackageFragment(
+                content = startMatch.value,
+                endReason = "self-closing",
+                hasClosingTag = true,
+            )
+        }
+
         val closingTag = "</package>"
         val closingIndex = xml.indexOf(closingTag, startIndex)
         if (closingIndex >= 0) {
@@ -390,46 +438,6 @@ class MainActivity : FlutterActivity() {
             Log.d(TAG, "fallback fragment parser failed: ${e.message}")
             null
         }
-    }
-
-    private fun scanChannelsFromFragment(fragment: String): List<Map<String, Any?>> {
-        val channelsById = LinkedHashMap<String, Map<String, Any?>>()
-        var searchIndex = 0
-        while (searchIndex < fragment.length) {
-            val startIndex = findNextChannelTagStart(fragment, searchIndex)
-            if (startIndex < 0) break
-            val endIndex = findTagEnd(fragment, startIndex)
-            if (endIndex < 0) break
-
-            val tag = fragment.substring(startIndex, endIndex + 1)
-            val attrs = parseXmlAttributes(tag)
-            buildChannelMap(
-                id = attrs["id"],
-                name = attrs["name"],
-                description = attrs["desc"],
-                importance = attrs["importance"],
-                importanceInt = attrs["importance-int"],
-            )?.let { channel ->
-                channelsById.putIfAbsent(channel["id"] as String, channel)
-            }
-            searchIndex = endIndex + 1
-        }
-        return channelsById.values.toList()
-    }
-
-    private fun findNextChannelTagStart(text: String, fromIndex: Int): Int {
-        var searchIndex = fromIndex
-        while (searchIndex < text.length) {
-            val startIndex = text.indexOf("<channel", searchIndex)
-            if (startIndex < 0) return -1
-            val nextCharIndex = startIndex + "<channel".length
-            val nextChar = text.getOrNull(nextCharIndex)
-            if (nextChar == null || nextChar.isWhitespace() || nextChar == '>' || nextChar == '/') {
-                return startIndex
-            }
-            searchIndex = nextCharIndex
-        }
-        return -1
     }
 
     private fun findTagEnd(text: String, startIndex: Int): Int {

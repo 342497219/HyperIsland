@@ -24,17 +24,6 @@ import io.github.d4viddf.hyperisland_kit.models.TextInfo
 /**
  * 通知超级岛|精简 通知构建器。
  * 基于 [NotificationIslandNotification]，额外对聊天类通知做文本清理：
- *
- * 标题规则：
- *   删除形如 [3条新消息]、[4条]、【5条】 的计数括号块，保留纯用户名。
- *   例："用户A [3条新消息]" → "用户A"
- *       "[4条]用户A" → "用户A"
- *
- * 正文规则：
- *   1. 删除正文开头的 [xx条] / 【xx条】 前缀。
- *      例："[4条]用户A:你好" → "用户A:你好"
- *   2. 若清理后的标题是单一发送人名称，进一步删除正文中的 "发送人:" 前缀。
- *      例："用户A:你好" → "你好"（当标题清理后 == "用户A"）
  */
 object NotificationIslandLiteNotification : IslandTemplate {
 
@@ -72,35 +61,21 @@ object NotificationIslandLiteNotification : IslandTemplate {
         )
     }
 
-    // ─── 文本清理 ──────────────────────────────────────────────────────────────
-
-    /**
-     * 删除标题中的计数括号块：[3条新消息]、[4条]、【5条】 等。
-     * 规则：括号内含有数字，则整块（含括号）删除。
-     */
     private val TITLE_COUNT_BRACKET = Regex("""[\[【(（][^\]】)）]*\d+[^\]】)）]*[\]】)）]\s*|\s*[\[【(（][^\]】)）]*\d+[^\]】)）]*[\]】)）]""")
 
     private fun cleanTitle(title: String): String =
         title.replace(TITLE_COUNT_BRACKET, "").trim()
 
-    /**
-     * 清理正文：
-     * 1. 删除开头的 [xx条] / 【xx条】 前缀（消息聚合计数标记）。
-     * 2. 若 cleanedTitle 是纯发送人名称（长度 ≤ 30），删除正文中 "发送人:" / "发送人：" 前缀。
-     */
     private val SUBTITLE_COUNT_PREFIX = Regex("""^[\[【(（][^\]】)）]*\d+[^\]】)）]*[\]】)）]\s*""")
 
     private fun cleanSubtitle(subtitle: String, cleanedTitle: String): String {
         var s = subtitle.replace(SUBTITLE_COUNT_PREFIX, "")
-        // 若标题是发送人名称，删除 "发送人:" 或 "发送人：" 前缀
         if (cleanedTitle.isNotEmpty() && cleanedTitle.length <= 30) {
             val senderPrefix = Regex("""^${Regex.escape(cleanedTitle)}\s*[:：]\s*""")
             s = s.replace(senderPrefix, "")
         }
         return s.trim()
     }
-
-    // ─── focusNotif == "off" 时走 Dispatcher ──────────────────────────────────
 
     private fun injectViaDispatcher(
         context: Context,
@@ -109,23 +84,18 @@ object NotificationIslandLiteNotification : IslandTemplate {
         cleanedSubtitle: String,
     ) {
         try {
-            val fallbackIcon = Icon.createWithResource(context, android.R.drawable.ic_dialog_info)
-            val displayIcon = when (data.iconMode) {
-                "notif_small" -> data.notifIcon ?: fallbackIcon
-                "notif_large" -> data.largeIcon ?: data.notifIcon ?: fallbackIcon
-                "app_icon"    -> data.appIconRaw ?: fallbackIcon
-                else          -> data.largeIcon ?: data.notifIcon ?: fallbackIcon
-            }.toRounded(context)
+            val resolvedFirstFloat  = data.firstFloat      == "on"
+            val resolvedEnableFloat = data.enableFloatMode == "on"
 
+            // 优化：不再传递图标，由 SystemUI 自动获取
             IslandDispatcher.post(
                 context,
                 IslandRequest(
                     title            = cleanedTitle,
                     content          = cleanedSubtitle.ifEmpty { cleanedTitle },
-                    icon             = displayIcon,
                     timeoutSecs      = data.islandTimeout,
-                    firstFloat       = data.firstFloat      == "on",
-                    enableFloat      = data.enableFloatMode == "on",
+                    firstFloat       = resolvedFirstFloat,
+                    enableFloat      = resolvedEnableFloat,
                     showNotification = false,
                     preserveStatusBarSmallIcon = data.preserveStatusBarSmallIcon != "off",
                     contentIntent    = data.contentIntent,
@@ -140,8 +110,6 @@ object NotificationIslandLiteNotification : IslandTemplate {
             XposedBridge.log("HyperIsland[NotifIslandLite]: Dispatcher island error: ${e.message}")
         }
     }
-
-    // ─── 主注入逻辑 ────────────────────────────────────────────────────────────
 
     private fun inject(
         context: Context,
@@ -234,8 +202,7 @@ object NotificationIslandLiteNotification : IslandTemplate {
             val resourceBundle = builder.buildResourceBundle()
             extras.putAll(resourceBundle)
             flattenActionsToExtras(resourceBundle, extras)
-            val wrapLongText = isWrapLongTextEnabled(context)
-            val jsonParam = fixTextButtonJson(builder.buildJsonParam(), wrapLongText)
+            val jsonParam = fixTextButtonJson(builder.buildJsonParam())
                 .let { if (!isOngoing) injectUpdatable(it, false) else it }
             extras.putString("miui.focus.param", jsonParam)
             if (showNotification) {
@@ -245,16 +212,10 @@ object NotificationIslandLiteNotification : IslandTemplate {
                 extras.putBoolean("hyperisland_preserve_status_bar_small_icon", true)
                 FocusNotifStatusBarIconHook.markDirectProxyPosted(timeoutSecs)
             }
-            XposedBridge.log(
-                "HyperIsland[NotifIslandLite]: Island injected — raw=$rawTitle | clean=$title | right=$rightContent | notifId=$notifId"
-            )
-
         } catch (e: Exception) {
             XposedBridge.log("HyperIsland[NotifIslandLite]: Island injection error: ${e.message}")
         }
     }
-
-    // ─── 工具函数（与 NotificationIslandNotification 保持一致）─────────────────
 
     private fun injectUpdatable(jsonParam: String, updatable: Boolean): String {
         return try {
@@ -265,7 +226,7 @@ object NotificationIslandLiteNotification : IslandTemplate {
         } catch (_: Exception) { jsonParam }
     }
 
-    private fun fixTextButtonJson(jsonParam: String, wrapLongText: Boolean = false): String {
+    private fun fixTextButtonJson(jsonParam: String): String {
         return try {
             val json = org.json.JSONObject(jsonParam)
             val pv2  = json.optJSONObject("param_v2") ?: return jsonParam
@@ -279,52 +240,22 @@ object NotificationIslandLiteNotification : IslandTemplate {
                     btn.remove("actionIntentType")
                 }
             }
-            if (wrapLongText) {
-                val iconTextInfo = pv2.optJSONObject("iconTextInfo")
-                if (iconTextInfo != null) {
-                    val content = iconTextInfo.optString("content", "")
-                    if (content.isNotEmpty()) {
-                        var visualLen = 0; var splitIdx = -1
-                        for (i in content.indices) {
-                            visualLen += if (content[i].code > 255) 2 else 1
-                            if (visualLen >= 36 && splitIdx == -1) splitIdx = i + 1
-                        }
-                        if (splitIdx != -1 && splitIdx < content.length) {
-                            val subContent = content.substring(splitIdx)
-                            if (!subContent.all { it == '.' || it == '…' || it.isWhitespace() }) {
-                                val coverInfo = org.json.JSONObject()
-                                val animIcon = iconTextInfo.optJSONObject("animIconInfo")
-                                if (animIcon != null) coverInfo.put("picCover", animIcon.optString("src", ""))
-                                coverInfo.put("title", iconTextInfo.optString("title", ""))
-                                coverInfo.put("content", content.substring(0, splitIdx))
-                                coverInfo.put("subContent", subContent)
-                                pv2.remove("iconTextInfo")
-                                pv2.put("coverInfo", coverInfo)
-                            }
-                        }
-                    }
-                }
-            }
             json.toString()
         } catch (_: Exception) { jsonParam }
-    }
-
-    private fun isWrapLongTextEnabled(context: Context): Boolean {
-        return try {
-            val uri = android.net.Uri.parse("content://io.github.hyperisland.settings/pref_wrap_long_text")
-            context.contentResolver.query(uri, null, null, null, null)
-                ?.use { if (it.moveToFirst()) it.getInt(0) != 0 else false } ?: false
-        } catch (_: Exception) { false }
     }
 
     private fun flattenActionsToExtras(resourceBundle: Bundle, extras: Bundle) {
         val nested = resourceBundle.getBundle("miui.focus.actions") ?: return
         for (key in nested.keySet()) {
-            val action: Notification.Action? = if (Build.VERSION.SDK_INT >= 33)
-                nested.getParcelable(key, Notification.Action::class.java)
-            else
-                @Suppress("DEPRECATION") nested.getParcelable(key)
+            val action: Notification.Action? = if (Build.VERSION.SDK_INT >= 33) nested.getParcelable(key, Notification.Action::class.java) else @Suppress("DEPRECATION") nested.getParcelable(key)
             if (action != null) extras.putParcelable(key, action)
         }
+    }
+
+    private fun isWrapLongTextEnabled(context: Context): Boolean {
+        return try {
+            val uri = android.net.Uri.parse("content://io.github.hyperisland.settings/pref_wrap_long_text")
+            context.contentResolver.query(uri, null, null, null, null)?.use { if (it.moveToFirst()) it.getInt(0) != 0 else false } ?: false
+        } catch (_: Exception) { false }
     }
 }
